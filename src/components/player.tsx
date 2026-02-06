@@ -10,13 +10,19 @@ import { Pause24Filled, Play24Filled } from '@fluentui/react-icons'
 import MiniPlay from './mini-player'
 import dayjs from 'dayjs'
 import { useDelayPlay } from '../tool'
-import { findDashcamPoint, formatDashcamDebugText, formatDashcamText } from '../dashcam'
+import { findDashcamPoint, formatDashcamDebugText } from '../dashcam'
 
-import { type Video, CameraEnum } from '../model'
+import { type Video, type DashcamPoint, CameraEnum } from '../model'
 
 const PLAYBACK_RATE_CYCLE = [1, 1.5, 2, 0.5]
 const DURATION_LOAD_CONCURRENCY = 4
 const EVENT_MARKER_VISUAL_HALF_WIDTH = 5
+const HUD_WIDTH = '35%'
+const HUD_MIN_WIDTH = '320px'
+const HUD_MAX_WIDTH = '520px'
+const HUD_BOTTOM = '56px'
+const HUD_SIGNAL_INSET_PX = 8
+const HUD_PEDAL_INSET_PX = 18
 
 const useStyles = makeStyles({
   root: {
@@ -54,29 +60,198 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralStencil1Alpha,
     ...shorthands.borderRadius('2px'),
   },
-  dashcam: {
+  dashcamHud: {
     position: 'absolute',
     left: '50%',
-    bottom: '40px',
+    bottom: HUD_BOTTOM,
     transform: 'translateX(-50%)',
-    textAlign: 'center',
-    minWidth: '280px',
-    maxWidth: '90%',
+    width: HUD_WIDTH,
+    minWidth: HUD_MIN_WIDTH,
+    maxWidth: HUD_MAX_WIDTH,
     color: tokens.colorNeutralBackground1Hover,
-    fontSize: '16px',
-    fontWeight: 500,
-    lineHeight: '22px',
-    whiteSpace: 'normal',
-    ...shorthands.padding('4px', '10px'),
+    ...shorthands.padding('8px', '12px'),
     backgroundColor: tokens.colorNeutralStencil1Alpha,
-    ...shorthands.borderRadius('2px'),
+    ...shorthands.borderRadius('8px'),
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    zIndex: 3,
+    pointerEvents: 'none',
+  },
+  dashTopRow: {
+    display: 'grid',
+    gridTemplateColumns: '58px 1fr 82px',
+    alignItems: 'center',
+    columnGap: '8px',
+  },
+  gearWrap: {
+    justifySelf: 'start',
+  },
+  gearCircle: {
+    width: '44px',
+    height: '44px',
+    borderRadius: '50%',
+    border: '2px solid rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'transparent',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gearLetter: {
+    fontSize: '24px',
+    lineHeight: '24px',
+    fontWeight: 800,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  apStateText: {
+    textAlign: 'center',
+    fontSize: '14px',
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  steeringWrap: {
+    justifySelf: 'end',
+    textAlign: 'center',
+  },
+  steeringWheel: {
+    position: 'relative',
+    width: '34px',
+    height: '34px',
+    borderRadius: '50%',
+    border: '2px solid rgba(255, 255, 255, 0.95)',
+    margin: '0 auto',
+  },
+  steeringNeedle: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: '2px',
+    height: '13px',
+    borderRadius: '2px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    transformOrigin: 'center 82%',
+  },
+  steeringText: {
+    marginTop: '2px',
+    fontSize: '11px',
+    fontVariantNumeric: 'tabular-nums',
+  },
+  dashMiddleRow: {
+    display: 'grid',
+    gridTemplateColumns: '64px 1fr 64px',
+    alignItems: 'center',
+    marginTop: '4px',
+  },
+  turnArrow: {
+    textAlign: 'center',
+    fontSize: '42px',
+    lineHeight: '42px',
+    fontWeight: 700,
+    opacity: 0.25,
+    transitionDuration: '120ms',
+  },
+  turnArrowLeft: {
+    transform: `translateX(${HUD_SIGNAL_INSET_PX}px)`,
+  },
+  turnArrowRight: {
+    transform: `translateX(-${HUD_SIGNAL_INSET_PX}px)`,
+  },
+  turnArrowActive: {
+    opacity: 1,
+    color: 'rgba(255, 214, 79, 0.98)',
+  },
+  dashSpeedWrap: {
+    textAlign: 'center',
+  },
+  speedValue: {
+    fontSize: '58px',
+    lineHeight: '54px',
+    fontWeight: 800,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  speedUnit: {
+    marginTop: '0',
+    fontSize: '13px',
+    lineHeight: '14px',
+    letterSpacing: '1px',
+    opacity: 0.95,
+  },
+  dashBottomRow: {
+    display: 'grid',
+    gridTemplateColumns: '54px 1fr 54px',
+    alignItems: 'end',
+    columnGap: '10px',
+    marginTop: '4px',
+  },
+  pedalBox: {
+    position: 'relative',
+    height: '62px',
+    ...shorthands.padding('6px', '4px'),
+    ...shorthands.borderRadius('6px'),
+    border: '1px solid rgba(255, 255, 255, 0.4)',
+    textAlign: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    ...shorthands.overflow('hidden'),
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    transitionDuration: '120ms',
+  },
+  pedalBoxLeft: {
+    transform: `translateX(${HUD_PEDAL_INSET_PX}px)`,
+  },
+  pedalBoxRight: {
+    transform: `translateX(-${HUD_PEDAL_INSET_PX}px)`,
+  },
+  pedalFill: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    width: '100%',
+    height: 0,
+    transitionDuration: '120ms',
+    pointerEvents: 'none',
+    zIndex: 1,
+  },
+  brakeFill: {
+    backgroundColor: 'rgba(204, 56, 56, 0.95)',
+  },
+  accelFill: {
+    backgroundColor: 'rgba(29, 160, 94, 0.95)',
+  },
+  pedalContent: {
+    position: 'relative',
+    zIndex: 2,
+  },
+  pedalLabel: {
+    fontSize: '12px',
+    lineHeight: '16px',
+    fontWeight: 600,
+  },
+  pedalValue: {
+    marginTop: '2px',
+    fontSize: '14px',
+    lineHeight: '16px',
+    fontWeight: 700,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  dashMeta: {
+    textAlign: 'center',
+    fontSize: '11px',
+    lineHeight: '14px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    fontVariantNumeric: 'tabular-nums',
+    opacity: 0.95,
   },
   dashcamDebug: {
-    marginTop: '4px',
+    marginTop: '2px',
     fontSize: '12px',
-    opacity: 0.9,
+    opacity: 0.95,
     whiteSpace: 'normal',
     wordBreak: 'break-all',
+    textAlign: 'center',
   },
   controlWrap: {
     display: 'flex',
@@ -202,6 +377,146 @@ function fmtTime(time: number) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim())
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+  return undefined
+}
+
+function toBoolean(value: unknown): boolean {
+  if (typeof value === 'boolean') {
+    return value
+  }
+  if (typeof value === 'number') {
+    return value !== 0
+  }
+  if (typeof value === 'string') {
+    const lower = value.trim().toLowerCase()
+    if (['1', 'true', 'yes', 'on'].includes(lower)) {
+      return true
+    }
+    if (['0', 'false', 'no', 'off', 'none'].includes(lower)) {
+      return false
+    }
+  }
+  return Boolean(value)
+}
+
+function formatGear(gear: DashcamPoint['gear']): string {
+  if (gear === undefined || gear === null) {
+    return '--'
+  }
+  const raw = String(gear).trim().toUpperCase()
+  const mapped = Number(raw)
+  if (Number.isFinite(mapped)) {
+    return ({ 0: 'P', 1: 'D', 2: 'R', 3: 'N' } as Record<number, string>)[mapped] ?? raw
+  }
+  return raw || '--'
+}
+
+function formatAutopilot(state: DashcamPoint['autopilotState']): string {
+  if (state === undefined || state === null || state === '') {
+    return '辅助驾驶 --'
+  }
+  const raw = String(state).trim().toUpperCase()
+  const labelMap: Record<string, string> = {
+    NONE: '辅助驾驶 关闭',
+    SELF_DRIVING: '辅助驾驶 FSD',
+    AUTOSTEER: '辅助驾驶 Autosteer',
+    TACC: '辅助驾驶 TACC',
+    '0': '辅助驾驶 关闭',
+    '1': '辅助驾驶 FSD',
+    '2': '辅助驾驶 Autosteer',
+    '3': '辅助驾驶 TACC',
+  }
+  return labelMap[raw] ?? `辅助驾驶 ${String(state)}`
+}
+
+function normalizeSignal(point?: DashcamPoint): { left: boolean; right: boolean } {
+  const byFieldLeft = toBoolean(point?.blinkerLeft)
+  const byFieldRight = toBoolean(point?.blinkerRight)
+  const raw = String(point?.turnSignal ?? '').trim().toLowerCase()
+  if (raw.includes('双') || raw.includes('hazard') || raw.includes('both')) {
+    return { left: true, right: true }
+  }
+  if (raw === '3') {
+    return { left: true, right: true }
+  }
+  if (raw.includes('左') || raw.includes('left') || raw === '1') {
+    return { left: true, right: false }
+  }
+  if (raw.includes('右') || raw.includes('right') || raw === '2') {
+    return { left: false, right: true }
+  }
+  return { left: byFieldLeft, right: byFieldRight }
+}
+
+function normalizeAcceleratorPercent(value: number | undefined): number | undefined {
+  if (!Number.isFinite(value)) {
+    return undefined
+  }
+  const raw = value as number
+  const scaled = raw >= 0 && raw <= 1 ? raw * 100 : raw
+  return Math.min(100, Math.max(0, scaled))
+}
+
+function normalizeBrakePercent(value: DashcamPoint['brakePressed']): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const scaled = value >= 0 && value <= 1 ? value * 100 : value
+    return Math.min(100, Math.max(0, scaled))
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) {
+      const scaled = parsed >= 0 && parsed <= 1 ? parsed * 100 : parsed
+      return Math.min(100, Math.max(0, scaled))
+    }
+  }
+  return toBoolean(value) ? 100 : 0
+}
+
+function clampPercent(value: number): number {
+  return Math.min(100, Math.max(0, value))
+}
+
+function formatFixed(value: number | undefined, digits = 1): string {
+  if (value === undefined || !Number.isFinite(value)) {
+    return '--'
+  }
+  return value.toFixed(digits)
+}
+
+function buildDashMeta(point?: DashcamPoint): string[] {
+  if (!point) {
+    return []
+  }
+  const chunks: string[] = []
+  if (Number.isFinite(point.heading)) {
+    chunks.push(`航向 ${formatFixed(point.heading, 0)}°`)
+  }
+  if (Number.isFinite(point.latitude) && Number.isFinite(point.longitude)) {
+    chunks.push(`${formatFixed(point.latitude, 5)}, ${formatFixed(point.longitude, 5)}`)
+  }
+  if (Number.isFinite(point.powerKw)) {
+    chunks.push(`功率 ${formatFixed(point.powerKw, 1)} kW`)
+  }
+  if (Number.isFinite(point.batteryLevel)) {
+    chunks.push(`电量 ${formatFixed(point.batteryLevel, 1)}%`)
+  }
+  return chunks
+}
+
+function cls(...values: Array<string | false>): string {
+  return values.filter(Boolean).join(' ')
+}
+
 function nextPlaybackRate(rate: number) {
   const index = PLAYBACK_RATE_CYCLE.findIndex(item => item === rate)
   if (index === -1) {
@@ -306,9 +621,21 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   const currentVideo = videos[currentClipIndex]
   const showPlayerDebug = localStorage.getItem('playerDebug') === '1'
   const dashcamPoint = findDashcamPoint(currentVideo?.dashcam, currentTime)
-  const dashcamText = formatDashcamText(dashcamPoint)
   const showDashcamDebug = localStorage.getItem('dashcamDebug') === '1'
   const dashcamDebugText = showDashcamDebug ? formatDashcamDebugText(dashcamPoint) : ''
+  const speedRaw = toFiniteNumber(dashcamPoint?.speed)
+  const speedMps = toFiniteNumber(dashcamPoint?.speedMps)
+  const speedKmh = speedRaw ?? (speedMps === undefined ? undefined : speedMps * 3.6)
+  const speedText = Number.isFinite(speedKmh) ? String(Math.max(0, Math.round(speedKmh))) : '--'
+  const steeringAngle = toFiniteNumber(dashcamPoint?.steeringAngle)
+  const steeringRotate = Math.max(-540, Math.min(540, steeringAngle ?? 0))
+  const steeringText = steeringAngle === undefined ? '--' : `${steeringAngle >= 0 ? '+' : ''}${steeringAngle.toFixed(1)}°`
+  const signalState = normalizeSignal(dashcamPoint)
+  const brakePercent = clampPercent(normalizeBrakePercent(dashcamPoint?.brakePressed))
+  const acceleratorPercent = normalizeAcceleratorPercent(toFiniteNumber(dashcamPoint?.acceleratorPedal))
+  const acceleratorValue = clampPercent(acceleratorPercent ?? 0)
+  const acceleratorText = acceleratorPercent === undefined ? '--' : `${Math.round(acceleratorPercent)}%`
+  const dashMeta = buildDashMeta(dashcamPoint)
 
   const clipStarts = useMemo(() => {
     let acc = 0
@@ -768,10 +1095,53 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
               <div className={styles.time}>
                 {dayjs(currentVideo.time + currentTime * 1000).format('YYYY-MM-DD HH:mm:ss')}
               </div>
-              {props.showDashcamData !== false && dashcamText ? (
-                <div className={styles.dashcam}>
-                  <div>{dashcamText}</div>
-                  {dashcamDebugText ? <div className={styles.dashcamDebug}>{dashcamDebugText}</div> : null}
+              {props.showDashcamData !== false && dashcamPoint ? (
+                <div className={styles.dashcamHud}>
+                  <div className={styles.dashTopRow}>
+                    <div className={styles.gearWrap}>
+                      <div className={styles.gearCircle}>
+                        <span className={styles.gearLetter}>{formatGear(dashcamPoint.gear)}</span>
+                      </div>
+                    </div>
+                    <div className={styles.apStateText}>{formatAutopilot(dashcamPoint.autopilotState)}</div>
+                    <div className={styles.steeringWrap}>
+                      <div className={styles.steeringWheel}>
+                        <div
+                          className={styles.steeringNeedle}
+                          style={{ transform: `translate(-50%, -50%) rotate(${steeringRotate}deg)` }}
+                        />
+                      </div>
+                      <div className={styles.steeringText}>{steeringText}</div>
+                    </div>
+                  </div>
+                  <div className={styles.dashMiddleRow}>
+                    <div className={cls(styles.turnArrow, styles.turnArrowLeft, signalState.left && styles.turnArrowActive)}>←</div>
+                    <div className={styles.dashSpeedWrap}>
+                      <div className={styles.speedValue}>{speedText}</div>
+                      <div className={styles.speedUnit}>KM/H</div>
+                    </div>
+                    <div className={cls(styles.turnArrow, styles.turnArrowRight, signalState.right && styles.turnArrowActive)}>→</div>
+                  </div>
+                  <div className={styles.dashBottomRow}>
+                    <div className={cls(styles.pedalBox, styles.pedalBoxLeft)}>
+                      <div className={cls(styles.pedalFill, styles.brakeFill)} style={{ height: `${brakePercent}%` }} />
+                      <div className={styles.pedalContent}>
+                        <div className={styles.pedalLabel}>刹车</div>
+                        <div className={styles.pedalValue}>{Math.round(brakePercent)}%</div>
+                      </div>
+                    </div>
+                    <div className={styles.dashMeta}>
+                      {dashMeta.length ? dashMeta.join(' | ') : ' '}
+                      {dashcamDebugText ? <div className={styles.dashcamDebug}>{dashcamDebugText}</div> : null}
+                    </div>
+                    <div className={cls(styles.pedalBox, styles.pedalBoxRight)}>
+                      <div className={cls(styles.pedalFill, styles.accelFill)} style={{ height: `${acceleratorValue}%` }} />
+                      <div className={styles.pedalContent}>
+                        <div className={styles.pedalLabel}>电门</div>
+                        <div className={styles.pedalValue}>{acceleratorText}</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </label>
