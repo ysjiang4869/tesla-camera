@@ -348,10 +348,10 @@ function App() {
                     {item.thumbnail ? <img alt={item.title} className={styles.menuThumb} loading="lazy" src={item.thumbnail} /> : <Record24Regular />}
                   </div>
                   <div className={styles.menuInfo}>
-                    <div className={styles.menuTitle}>{item.title}</div>
+                    <div className={styles.menuTitle}>{dayjs(item.time).format('M月D日 H:mm')}</div>
                     <div className={styles.menuMeta}>{TYPE_LABEL_MAP[item.type]} | {item.city ?? '未知位置'}</div>
                     <div className={styles.menuMeta}>
-                      事件时间: {item.event ? dayjs(item.event).format('YYYY-MM-DD HH:mm') : '-'}
+                      事件时间: {item.event ? dayjs(item.event).format('HH:mm:ss') : '-'}
                     </div>
                     <div className={styles.menuMeta}>
                       片段数: {item.clips.length}
