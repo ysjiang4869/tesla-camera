@@ -12,7 +12,7 @@ import {
 } from '../model'
 import { convertFileSrc } from '@tauri-apps/api/tauri'
 import { open } from '@tauri-apps/api/dialog'
-import { readTextFile, readDir } from '@tauri-apps/api/fs'
+import { readTextFile, readDir, readBinaryFile } from '@tauri-apps/api/fs'
 import {
   getClipPrefix, isDashcamMetaFile, mergeDashcamPoints, parseDashcamTelemetry,
 } from '../dashcam'
@@ -83,6 +83,10 @@ function convertVideoFiles(videoFiles: TauriFile[]): OriginVideo[] {
           url: convertFileSrc(path),
           name,
         })
+      },
+      async getBuffer() {
+        const binary = await readBinaryFile(path)
+        return binary.buffer.slice(binary.byteOffset, binary.byteOffset + binary.byteLength)
       },
       name,
       path,

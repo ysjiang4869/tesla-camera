@@ -83,6 +83,10 @@ function convertFiles(videoFiles: VideoFile[]): OriginVideo[] {
           name,
         }
       },
+      async getBuffer() {
+        const file = await fs.getFile()
+        return file.arrayBuffer()
+      },
       name,
       path,
     }

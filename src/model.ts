@@ -30,6 +30,7 @@ export interface ExportTaskType {
 
 export interface FileData {
   get(): Promise<{ url: string; name: string }>
+  getBuffer?: () => Promise<ArrayBuffer>
   name: string
   path: string
 }

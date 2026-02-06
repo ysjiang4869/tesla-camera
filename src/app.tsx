@@ -22,6 +22,7 @@ import FfmpegExport from './components/ffmpeg-export'
 import FsSystem from './components/fs-system'
 import CheckUpdate from './components/check-update'
 import { TypeEnum, type ModelState, type OriginVideo } from './model'
+import { parseDashcamFromMp4 } from './dashcam'
 
 const useStyles = makeStyles({
   root: {
@@ -179,6 +180,14 @@ function App() {
       await origin.src_l.get(),
       await origin.src_r.get(),
     ]
+    if (!origin.dashcam?.length && origin.src_f.getBuffer) {
+      try {
+        const frontBuffer = await origin.src_f.getBuffer()
+        origin.dashcam = parseDashcamFromMp4(frontBuffer)
+      } catch {
+      // ignore malformed telemetry payloads
+      }
+    }
     setState({
       ...state,
       current: {

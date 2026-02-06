@@ -9,7 +9,7 @@ import { Pause24Filled, Play24Filled } from '@fluentui/react-icons'
 import MiniPlay from './mini-player'
 import dayjs from 'dayjs'
 import { useDelayPlay } from '../tool'
-import { findDashcamPoint, formatDashcamText } from '../dashcam'
+import { findDashcamPoint, formatDashcamDebugText, formatDashcamText } from '../dashcam'
 
 import { type Video, CameraEnum } from '../model'
 
@@ -65,6 +65,13 @@ const useStyles = makeStyles({
     ...shorthands.padding('4px', '10px'),
     backgroundColor: tokens.colorNeutralStencil1Alpha,
     ...shorthands.borderRadius('2px'),
+  },
+  dashcamDebug: {
+    marginTop: '4px',
+    fontSize: '12px',
+    opacity: 0.9,
+    whiteSpace: 'normal',
+    wordBreak: 'break-all',
   },
   controlWrap: {
     display: 'flex',
@@ -127,7 +134,10 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const inputIsFocus = useRef(false)
   const { delayPlay } = useDelayPlay()
-  const dashcamText = formatDashcamText(findDashcamPoint(props.video?.dashcam, currentTime))
+  const dashcamPoint = findDashcamPoint(props.video?.dashcam, currentTime)
+  const dashcamText = formatDashcamText(dashcamPoint)
+  const showDashcamDebug = localStorage.getItem('dashcamDebug') === '1'
+  const dashcamDebugText = showDashcamDebug ? formatDashcamDebugText(dashcamPoint) : ''
   function onKeyUp(e: Parameters<React.KeyboardEventHandler>[0]) {
     e.preventDefault()
     switch (e.code) {
@@ -239,7 +249,12 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
               <div className={styles.time}>
                 {dayjs(props.video.time + currentTime * 1000).format('YYYY年MM月DD日 HH:mm:ss')}
               </div>
-              {dashcamText ? <div className={styles.dashcam}>{dashcamText}</div> : null}
+              {dashcamText ? (
+                <div className={styles.dashcam}>
+                  <div>{dashcamText}</div>
+                  {dashcamDebugText ? <div className={styles.dashcamDebug}>{dashcamDebugText}</div> : null}
+                </div>
+              ) : null}
             </label>
             <div className={styles.controlWrap}>
               {
