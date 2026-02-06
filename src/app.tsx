@@ -229,27 +229,9 @@ function App() {
           currentGroup: undefined,
         }
       }
-      const nextCurrentGroup: VideoGroup = {
-        ...prev.currentGroup,
-        title: nextMeta.title,
-        time: nextMeta.time,
-        type: nextMeta.type,
-        dir: nextMeta.dir,
-        event: nextMeta.event,
-        city: nextMeta.city,
-        latitude: nextMeta.latitude,
-        longitude: nextMeta.longitude,
-        reason: nextMeta.reason,
-        thumbnail: nextMeta.thumbnail,
-      }
-      const nextCurrent = prev.current
-        ? nextCurrentGroup.videos.find(video => video.time === prev.current?.time) ?? prev.current
-        : nextCurrentGroup.videos[0]
       return {
         ...prev,
         list: groups,
-        currentGroup: nextCurrentGroup,
-        current: nextCurrent,
       }
     })
   }

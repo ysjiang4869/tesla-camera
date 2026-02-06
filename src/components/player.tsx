@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   makeStyles,
   shorthands,
   tokens,
   Slider,
+  Button,
 } from '@fluentui/react-components'
 import { Pause24Filled, Play24Filled } from '@fluentui/react-icons'
 import MiniPlay from './mini-player'
@@ -12,6 +13,8 @@ import { useDelayPlay } from '../tool'
 import { findDashcamPoint, formatDashcamDebugText, formatDashcamText } from '../dashcam'
 
 import { type Video, CameraEnum } from '../model'
+
+const PLAYBACK_RATE_CYCLE = [1, 1.5, 2, 0.5]
 
 const useStyles = makeStyles({
   root: {
@@ -77,13 +80,16 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     ...shorthands.gap('10px'),
+    flexWrap: 'wrap',
   },
   slider: {
     flexGrow: 1,
+    minWidth: '320px',
   },
   sliderTime: {
-    minWidth: '40px',
+    minWidth: '62px',
     textAlign: 'center',
+    fontVariantNumeric: 'tabular-nums',
   },
   iconButton: {
     cursor: 'pointer',
@@ -91,9 +97,18 @@ const useStyles = makeStyles({
       color: tokens.colorNeutralForeground2,
     },
   },
-  empty: {
-
+  speedWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    ...shorthands.gap('4px'),
   },
+  speedButton: {
+    minWidth: '50px',
+  },
+  seekButton: {
+    minWidth: '58px',
+  },
+  empty: {},
   playFocusInput: {
     opacity: 0,
     position: 'fixed',
@@ -120,10 +135,101 @@ function getSrc(camera: CameraEnum, video: Video): string {
   }
 }
 
+function normalizeDuration(value?: number): number {
+  if (!Number.isFinite(value) || !value || value <= 0) {
+    return 0
+  }
+  return value
+}
+
 function fmtTime(time: number) {
-  const minutes = Math.floor(time / 60)
-  const seconds = Math.ceil(time % 60)
-  return `${minutes}:${seconds}`
+  const totalSeconds = Math.max(0, Math.floor(time))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function nextPlaybackRate(rate: number) {
+  const index = PLAYBACK_RATE_CYCLE.findIndex(item => item === rate)
+  if (index === -1) {
+    return 1
+  }
+  return PLAYBACK_RATE_CYCLE[(index + 1) % PLAYBACK_RATE_CYCLE.length]
+}
+
+function buildInitialClipDurations(videos?: Video[]): number[] {
+  if (!videos?.length) {
+    return []
+  }
+  const durations = videos.map((_, index) => {
+    if (index < videos.length - 1) {
+      const diff = (videos[index + 1].time - videos[index].time) / 1000
+      if (diff > 1 && diff < 300) {
+        return diff
+      }
+    }
+    return 60
+  })
+  if (durations.length > 1) {
+    durations[durations.length - 1] = durations[durations.length - 2]
+  }
+  return durations
+}
+
+function locateClipByTimelineTime(timelineTime: number, clipDurations: number[]): { index: number; time: number } {
+  if (!clipDurations.length) {
+    return { index: 0, time: 0 }
+  }
+  let remains = Math.max(0, timelineTime)
+  for (let index = 0; index < clipDurations.length; index++) {
+    const duration = Math.max(normalizeDuration(clipDurations[index]), 0.1)
+    if (remains < duration || index === clipDurations.length - 1) {
+      return {
+        index,
+        time: Math.min(remains, Math.max(duration - 0.01, 0)),
+      }
+    }
+    remains -= duration
+  }
+  return { index: clipDurations.length - 1, time: 0 }
+}
+
+async function loadClipDuration(src: string): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.src = src
+
+    const timeout = window.setTimeout(() => finish(undefined), 3000)
+
+    function cleanup() {
+      window.clearTimeout(timeout)
+      video.removeEventListener('loadedmetadata', onLoadedMetadata)
+      video.removeEventListener('error', onError)
+    }
+
+    function finish(duration?: number) {
+      cleanup()
+      video.src = ''
+      resolve(normalizeDuration(duration) || undefined)
+    }
+
+    function onLoadedMetadata() {
+      finish(video.duration)
+    }
+
+    function onError() {
+      finish(undefined)
+    }
+
+    video.addEventListener('loadedmetadata', onLoadedMetadata)
+    video.addEventListener('error', onError)
+    video.load()
+  })
 }
 
 const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
@@ -131,47 +237,129 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   const [currentCamera, setCurrentCamera] = useState(CameraEnum.前)
   const [currentClipIndex, setCurrentClipIndex] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
+  const [currentTimelineTime, setCurrentTimelineTime] = useState(0)
   const [paused, setPaused] = useState(true)
-  const [duration, setDuration] = useState(0)
+  const [playbackRate, setPlaybackRate] = useState(1)
+  const [clipDurations, setClipDurations] = useState<number[]>([])
   const videoRef = useRef<HTMLVideoElement>(null)
   const inputIsFocus = useRef(false)
+  const durationLoadTokenRef = useRef(0)
   const { delayPlay } = useDelayPlay()
   const currentVideo = props.videos?.[currentClipIndex]
   const dashcamPoint = findDashcamPoint(currentVideo?.dashcam, currentTime)
   const dashcamText = formatDashcamText(dashcamPoint)
   const showDashcamDebug = localStorage.getItem('dashcamDebug') === '1'
   const dashcamDebugText = showDashcamDebug ? formatDashcamDebugText(dashcamPoint) : ''
+
+  const clipStarts = useMemo(() => {
+    let acc = 0
+    return clipDurations.map((duration) => {
+      const start = acc
+      acc += normalizeDuration(duration)
+      return start
+    })
+  }, [clipDurations])
+
+  const totalDuration = useMemo(
+    () => clipDurations.reduce((acc, duration) => acc + normalizeDuration(duration), 0),
+    [clipDurations],
+  )
+  const currentClipDuration = normalizeDuration(clipDurations[currentClipIndex])
+  const sliderMax = totalDuration > 0 ? totalDuration : 0.1
+
   useEffect(() => {
     setCurrentClipIndex(0)
     setCurrentTime(0)
-    setDuration(0)
+    setCurrentTimelineTime(0)
     setPaused(true)
+    setPlaybackRate(1)
     setCurrentCamera(CameraEnum.前)
+    setClipDurations(buildInitialClipDurations(props.videos))
+    durationLoadTokenRef.current += 1
+
     if (!videoRef.current || !props.videos?.length) {
       return
     }
+
     videoRef.current.pause()
     videoRef.current.src = getSrc(CameraEnum.前, props.videos[0])
     videoRef.current.currentTime = 0
+
+    const currentToken = durationLoadTokenRef.current
+    props.videos.forEach((video, index) => {
+      void loadClipDuration(getSrc(CameraEnum.前, video)).then((duration) => {
+        const nextDuration = normalizeDuration(duration)
+        if (!nextDuration || currentToken !== durationLoadTokenRef.current) {
+          return
+        }
+        setClipDurations((prev) => {
+          if (!prev.length || index >= prev.length) {
+            return prev
+          }
+          if (Math.abs(normalizeDuration(prev[index]) - nextDuration) < 0.01) {
+            return prev
+          }
+          const next = [...prev]
+          next[index] = nextDuration
+          return next
+        })
+      })
+    })
   }, [props.videos])
 
-  function switchToClip(nextIndex: number, autoplay: boolean) {
+  useEffect(() => {
+    setCurrentTimelineTime((clipStarts[currentClipIndex] ?? 0) + currentTime)
+  }, [clipStarts, currentClipIndex, currentTime])
+
+  useEffect(() => {
+    if (!videoRef.current) return
+    videoRef.current.playbackRate = playbackRate
+  }, [playbackRate, currentClipIndex])
+
+  function switchToClip(nextIndex: number, autoplay: boolean, startTime = 0) {
     if (!videoRef.current || !props.videos?.[nextIndex]) {
       return
     }
     const nextVideo = props.videos[nextIndex]
+    const nextDuration = normalizeDuration(clipDurations[nextIndex]) || 0
+    const safeTime = nextDuration
+      ? Math.min(Math.max(startTime, 0), Math.max(nextDuration - 0.01, 0))
+      : Math.max(startTime, 0)
     setCurrentClipIndex(nextIndex)
-    setCurrentTime(0)
-    setDuration(0)
+    setCurrentTime(safeTime)
+    setCurrentTimelineTime((clipStarts[nextIndex] ?? 0) + safeTime)
     videoRef.current.pause()
     videoRef.current.src = getSrc(currentCamera, nextVideo)
-    videoRef.current.currentTime = 0
+    videoRef.current.currentTime = safeTime
+    videoRef.current.playbackRate = playbackRate
     if (autoplay) {
       delayPlay(videoRef.current)
     } else {
       setPaused(true)
     }
     props.onVideoChange?.(nextVideo)
+  }
+
+  function seekTimeline(nextTimelineTime: number) {
+    if (!videoRef.current || !props.videos?.length) return
+    const clamped = Math.min(Math.max(nextTimelineTime, 0), sliderMax)
+    const { index, time } = locateClipByTimelineTime(clamped, clipDurations)
+    const autoplay = !videoRef.current.paused
+    if (index === currentClipIndex) {
+      videoRef.current.pause()
+      videoRef.current.currentTime = time
+      setCurrentTime(time)
+      setCurrentTimelineTime(clamped)
+      if (autoplay) {
+        delayPlay(videoRef.current)
+      }
+      return
+    }
+    switchToClip(index, autoplay, time)
+  }
+
+  function seekOffset(deltaSeconds: number) {
+    seekTimeline(currentTimelineTime + deltaSeconds)
   }
 
   function onKeyUp(e: Parameters<React.KeyboardEventHandler>[0]) {
@@ -183,6 +371,12 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
         } else {
           pause()
         }
+        break
+      case 'ArrowLeft':
+        seekOffset(-10)
+        break
+      case 'ArrowRight':
+        seekOffset(10)
         break
       case 'KeyW':
         onSelectCamera(CameraEnum.前)
@@ -200,62 +394,82 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
       //
     }
   }
+
   function onSelectCamera(val: CameraEnum) {
     if (!videoRef.current || !currentVideo) return
     setCurrentCamera(val)
     const prePaused = videoRef.current.paused
-    const currentTime = videoRef.current.currentTime
+    const time = videoRef.current.currentTime
     videoRef.current.pause()
     videoRef.current.src = getSrc(val, currentVideo)
-    videoRef.current.currentTime = currentTime
+    videoRef.current.currentTime = time
+    videoRef.current.playbackRate = playbackRate
     if (!prePaused) {
       delayPlay(videoRef.current)
     }
   }
+
   function onTimeupdate() {
     if (!videoRef.current) return
-    if (videoRef.current.currentTime >= videoRef.current.duration - 0.05) {
+    const duration = normalizeDuration(clipDurations[currentClipIndex]) || normalizeDuration(videoRef.current.duration)
+    const time = videoRef.current.currentTime
+    if (duration && time >= duration - 0.05) {
       const nextIndex = currentClipIndex + 1
       if (props.videos && nextIndex < props.videos.length) {
         switchToClip(nextIndex, !videoRef.current.paused)
         return
       }
-      setCurrentTime(0)
+      const timelineEnd = (clipStarts[currentClipIndex] ?? 0) + duration
+      setCurrentTime(duration)
+      setCurrentTimelineTime(timelineEnd)
       videoRef.current.pause()
-    } else {
-      setCurrentTime(videoRef.current.currentTime)
+      return
     }
+    setCurrentTime(time)
+    setCurrentTimelineTime((clipStarts[currentClipIndex] ?? 0) + time)
   }
+
   function play() {
     if (!videoRef.current) return
-    videoRef.current.play()
+    videoRef.current.playbackRate = playbackRate
+    void videoRef.current.play()
     setPaused(false)
   }
+
   function pause() {
     if (!videoRef.current) return
     videoRef.current.pause()
     setPaused(true)
   }
+
   function onLoadedMetadata() {
     if (!videoRef.current) return
-    setDuration(videoRef.current.duration)
-  }
-  function onSeek(val: number) {
-    if (!videoRef.current) return
-    const prePaused = videoRef.current.paused
-    videoRef.current.pause()
-    setCurrentTime(val)
-    videoRef.current.currentTime = val
-    if (!prePaused) {
-      delayPlay(videoRef.current)
+    videoRef.current.playbackRate = playbackRate
+    const loadedDuration = normalizeDuration(videoRef.current.duration)
+    if (!loadedDuration) {
+      return
     }
+    setClipDurations((prev) => {
+      if (!prev.length || currentClipIndex >= prev.length) {
+        return prev
+      }
+      if (Math.abs(normalizeDuration(prev[currentClipIndex]) - loadedDuration) < 0.01) {
+        return prev
+      }
+      const next = [...prev]
+      next[currentClipIndex] = loadedDuration
+      return next
+    })
   }
+
   function onPlayFocus() {
     inputIsFocus.current = true
   }
+
   function onPlayBlur() {
     inputIsFocus.current = false
   }
+
   return (
     <div className={styles.root}>
       {
@@ -271,22 +485,21 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                 onPause={() => setPaused(true)}
                 onPlay={() => setPaused(false)}
                 onTimeUpdate={onTimeupdate}
-              >
-                <source src={getSrc(currentCamera, currentVideo)} type="video/mp4" />
-              </video>
+              />
               {
-                  [CameraEnum.前, CameraEnum.后, CameraEnum.左, CameraEnum.右].map(camera => (
-                    <MiniPlay
-                      camera={camera}
-                      currentTime={currentTime}
-                      isActive={currentCamera === camera}
-                      key={camera}
-                      paused={paused}
-                      src={getSrc(camera, currentVideo)}
-                      onClick={() => onSelectCamera(camera)}
-                    />
-                  ))
-                }
+                [CameraEnum.前, CameraEnum.后, CameraEnum.左, CameraEnum.右].map(camera => (
+                  <MiniPlay
+                    camera={camera}
+                    currentTime={currentTime}
+                    isActive={currentCamera === camera}
+                    key={camera}
+                    paused={paused}
+                    playbackRate={playbackRate}
+                    src={getSrc(camera, currentVideo)}
+                    onClick={() => onSelectCamera(camera)}
+                  />
+                ))
+              }
               <div className={styles.time}>
                 {dayjs(currentVideo.time + currentTime * 1000).format('YYYY-MM-DD HH:mm')}
                 {props.videos && props.videos.length > 1 ? ` (${currentClipIndex + 1}/${props.videos.length})` : ''}
@@ -300,25 +513,37 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
             </label>
             <div className={styles.controlWrap}>
               {
-                  paused
-                    ? <Play24Filled
-                        className={styles.iconButton}
-                        onClick={play}
-                      />
-                    : <Pause24Filled
-                        className={styles.iconButton}
-                        onClick={pause}
-                      />
-                }
-              <div className={styles.sliderTime}>{fmtTime(currentTime)}</div>
+                paused
+                  ? <Play24Filled
+                      className={styles.iconButton}
+                      onClick={play}
+                    />
+                  : <Pause24Filled
+                      className={styles.iconButton}
+                      onClick={pause}
+                    />
+              }
+              <Button className={styles.seekButton} size="small" onClick={() => seekOffset(-10)}>-10s</Button>
+              <Button className={styles.seekButton} size="small" onClick={() => seekOffset(10)}>+10s</Button>
+              <div className={styles.speedWrap}>
+                <Button
+                  appearance="subtle"
+                  className={styles.speedButton}
+                  size="small"
+                  onClick={() => setPlaybackRate(rate => nextPlaybackRate(rate))}
+                >
+                  {playbackRate}x
+                </Button>
+              </div>
+              <div className={styles.sliderTime}>{fmtTime(currentTimelineTime)}</div>
               <Slider
                 className={styles.slider}
-                max={duration}
+                max={sliderMax}
                 min={0}
-                value={currentTime}
-                onChange={(_, data) => onSeek(data.value)}
+                value={Math.min(currentTimelineTime, sliderMax)}
+                onChange={(_, data) => seekTimeline(Number(data.value))}
               />
-              <div className={styles.sliderTime}>{fmtTime(duration)}</div>
+              <div className={styles.sliderTime}>{fmtTime(totalDuration || currentClipDuration)}</div>
             </div>
             <input
               autoFocus
@@ -340,8 +565,6 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   )
 }
 
-Player.defaultProps = {
-
-}
+Player.defaultProps = {}
 
 export default Player

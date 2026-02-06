@@ -9,6 +9,7 @@ interface MiniPlayProps {
   camera: number
   isActive: boolean
   paused: boolean
+  playbackRate: number
   onClick: () => void
 }
 
@@ -65,6 +66,7 @@ const MiniPlay: React.FC<MiniPlayProps> = (props) => {
     }
     if (!props.paused && videoRef.current.paused) {
       videoRef.current.currentTime = props.currentTime
+      videoRef.current.playbackRate = props.playbackRate
       if (playTimerRef.current) {
         clearTimeout(playTimerRef.current)
       }
@@ -73,13 +75,17 @@ const MiniPlay: React.FC<MiniPlayProps> = (props) => {
         playTimerRef.current = null
       }, 200)
     }
-  }, [props.paused])
+  }, [props.paused, props.currentTime, props.playbackRate])
+  useEffect(() => {
+    if (!videoRef.current) return
+    videoRef.current.playbackRate = props.playbackRate
+  }, [props.playbackRate])
   useEffect(() => {
     if (!videoRef.current) return
     if (props.paused) {
       videoRef.current.currentTime = props.currentTime
     }
-  }, [props.currentTime])
+  }, [props.currentTime, props.paused])
   return (
     <div
       className={cls(styles.root, `c${props.camera}`)}
@@ -103,6 +109,7 @@ MiniPlay.defaultProps = {
   camera: 0,
   isActive: false,
   paused: false,
+  playbackRate: 1,
 }
 
 export default MiniPlay
