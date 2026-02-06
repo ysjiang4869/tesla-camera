@@ -269,6 +269,8 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const inputIsFocus = useRef(false)
   const durationLoadTokenRef = useRef(0)
+  const autoPlayAfterSwitchRef = useRef(false)
+  const playIntentRef = useRef(false)
   const { delayPlay } = useDelayPlay()
   const currentVideo = props.videos?.[currentClipIndex]
   const dashcamPoint = findDashcamPoint(currentVideo?.dashcam, currentTime)
@@ -336,6 +338,8 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
     setCurrentCamera(CameraEnum.前)
     setClipDurations(buildInitialClipDurations(props.videos))
     durationLoadTokenRef.current += 1
+    autoPlayAfterSwitchRef.current = false
+    playIntentRef.current = false
 
     if (!videoRef.current || !props.videos?.length) {
       return
@@ -389,22 +393,32 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
     setCurrentTime(safeTime)
     setCurrentTimelineTime((clipStarts[nextIndex] ?? 0) + safeTime)
     videoRef.current.pause()
+    autoPlayAfterSwitchRef.current = autoplay
     videoRef.current.src = getSrc(currentCamera, nextVideo)
     videoRef.current.currentTime = safeTime
     videoRef.current.playbackRate = playbackRate
-    if (autoplay) {
-      delayPlay(videoRef.current)
-    } else {
+    if (!autoplay) {
       setPaused(true)
     }
     props.onVideoChange?.(nextVideo)
+  }
+
+  function onCanPlay() {
+    if (!videoRef.current || !autoPlayAfterSwitchRef.current) {
+      return
+    }
+    autoPlayAfterSwitchRef.current = false
+    videoRef.current.playbackRate = playbackRate
+    void videoRef.current.play().catch(() => {
+      delayPlay(videoRef.current as HTMLVideoElement)
+    })
   }
 
   function seekTimeline(nextTimelineTime: number) {
     if (!videoRef.current || !props.videos?.length) return
     const clamped = Math.min(Math.max(nextTimelineTime, 0), sliderMax)
     const { index, time } = locateClipByTimelineTime(clamped, clipDurations)
-    const autoplay = !videoRef.current.paused
+    const autoplay = playIntentRef.current
     if (index === currentClipIndex) {
       videoRef.current.pause()
       videoRef.current.currentTime = time
@@ -458,13 +472,13 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   function onSelectCamera(val: CameraEnum) {
     if (!videoRef.current || !currentVideo) return
     setCurrentCamera(val)
-    const prePaused = videoRef.current.paused
+    const shouldResume = playIntentRef.current
     const time = videoRef.current.currentTime
     videoRef.current.pause()
     videoRef.current.src = getSrc(val, currentVideo)
     videoRef.current.currentTime = time
     videoRef.current.playbackRate = playbackRate
-    if (!prePaused) {
+    if (shouldResume) {
       delayPlay(videoRef.current)
     }
   }
@@ -476,12 +490,13 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
     if (duration && time >= duration - 0.05) {
       const nextIndex = currentClipIndex + 1
       if (props.videos && nextIndex < props.videos.length) {
-        switchToClip(nextIndex, !videoRef.current.paused)
+        switchToClip(nextIndex, playIntentRef.current)
         return
       }
       const timelineEnd = (clipStarts[currentClipIndex] ?? 0) + duration
       setCurrentTime(duration)
       setCurrentTimelineTime(timelineEnd)
+      playIntentRef.current = false
       videoRef.current.pause()
       return
     }
@@ -491,6 +506,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
 
   function play() {
     if (!videoRef.current) return
+    playIntentRef.current = true
     videoRef.current.playbackRate = playbackRate
     void videoRef.current.play()
     setPaused(false)
@@ -498,6 +514,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
 
   function pause() {
     if (!videoRef.current) return
+    playIntentRef.current = false
     videoRef.current.pause()
     setPaused(true)
   }
@@ -541,6 +558,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                 className={styles.video}
                 id="player"
                 ref={videoRef}
+                onCanPlay={onCanPlay}
                 onLoadedMetadata={onLoadedMetadata}
                 onPause={() => setPaused(true)}
                 onPlay={() => setPaused(false)}
