@@ -14,7 +14,7 @@ import {
   Badge,
 } from '@fluentui/react-components'
 import {
-  Record24Regular, Code24Regular, BookQuestionMark24Regular,
+  Record24Regular, Code24Regular, BookQuestionMark24Regular, Eye24Regular, EyeOff24Regular,
 } from '@fluentui/react-icons'
 import Player from './components/player'
 import DirectoryAccess from './components/directory-access'
@@ -199,6 +199,7 @@ const tabs = [
 function App() {
   const styles = useStyles()
   const [filterType, setFilterType] = useState(TypeEnum.所有)
+  const [showDashcamData, setShowDashcamData] = useState(true)
   const [state, setState] = useState<ModelState>({
     type: TypeEnum.所有,
     list: [],
@@ -378,6 +379,13 @@ function App() {
                 : <FfmpegTerminal video={state.current} />}
             </div>
             <div className={styles.headerRight}>
+              <Tooltip content={showDashcamData ? '隐藏 Dash 数据' : '显示 Dash 数据'} relationship="label">
+                <Button
+                  aria-label={showDashcamData ? '隐藏 Dash 数据' : '显示 Dash 数据'}
+                  icon={showDashcamData ? <Eye24Regular /> : <EyeOff24Regular />}
+                  onClick={() => setShowDashcamData(prev => !prev)}
+                />
+              </Tooltip>
               <CheckUpdate />
               <Tooltip
                 content={<>查看源代码 (本项目<Caption1Stronger>不会上传</Caption1Stronger>您的隐私视频，并且接受公开的代码审查)</>}
@@ -416,6 +424,7 @@ function App() {
             <Player
               eventTime={state.currentGroup?.event}
               key={state.currentGroup?.id}
+              showDashcamData={showDashcamData}
               videos={state.currentGroup?.videos}
               onVideoChange={onCurrentVideoChange}
             />

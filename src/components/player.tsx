@@ -159,6 +159,7 @@ const useStyles = makeStyles({
 interface PlayerProps {
   videos?: Video[]
   eventTime?: number
+  showDashcamData?: boolean
   onVideoChange?: (video: Video) => void
 }
 
@@ -767,7 +768,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
               <div className={styles.time}>
                 {dayjs(currentVideo.time + currentTime * 1000).format('YYYY-MM-DD HH:mm:ss')}
               </div>
-              {dashcamText ? (
+              {props.showDashcamData !== false && dashcamText ? (
                 <div className={styles.dashcam}>
                   <div>{dashcamText}</div>
                   {dashcamDebugText ? <div className={styles.dashcamDebug}>{dashcamDebugText}</div> : null}
