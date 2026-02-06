@@ -14,15 +14,21 @@ interface FieldSpec {
 }
 
 const FIELD_SPECS: FieldSpec[] = [
+  { key: 'metadataVersion', aliases: ['metadata_version', 'version'], label: '元数据版本' },
+  { key: 'frameSeqNo', aliases: ['frame_seq_no', 'frame_seq'], label: '帧序号' },
+  { key: 'speedMps', aliases: ['vehicle_speed_mps', 'speed_mps'], label: '速度', unit: 'm/s', digits: 2 },
   { key: 'speed', aliases: ['speed', 'speedkph', 'vehicle_speed', 'gps_speed', 'veh_speed'], label: '车速', unit: 'km/h', digits: 0 },
-  { key: 'steeringAngle', aliases: ['steeringangle', 'steering_angle', 'steering', 'steer_angle'], label: '方向盘', unit: '°', digits: 1 },
-  { key: 'gear', aliases: ['gear', 'selectedgear'], label: '档位' },
-  { key: 'brakePressed', aliases: ['brake', 'brake_pressed', 'is_braking'], label: '刹车' },
-  { key: 'acceleratorPedal', aliases: ['accelerator', 'accelerator_pedal', 'throttle', 'pedal'], label: '电门', unit: '%', digits: 1 },
+  { key: 'steeringAngle', aliases: ['steeringangle', 'steering_angle', 'steering', 'steer_angle', 'steering_wheel_angle'], label: '方向盘', unit: '°', digits: 1 },
+  { key: 'gear', aliases: ['gear', 'selectedgear', 'gear_state'], label: '档位' },
+  { key: 'autopilotState', aliases: ['autopilot_state', 'autopilot', 'ap_state'], label: '辅助驾驶' },
+  { key: 'brakePressed', aliases: ['brake', 'brake_pressed', 'is_braking', 'brake_applied'], label: '刹车' },
+  { key: 'acceleratorPedal', aliases: ['accelerator', 'accelerator_pedal', 'throttle', 'pedal', 'accelerator_pedal_position'], label: '电门', unit: '%', digits: 1 },
+  { key: 'blinkerLeft', aliases: ['blinker_on_left', 'left_blinker', 'turn_left'], label: '左转灯' },
+  { key: 'blinkerRight', aliases: ['blinker_on_right', 'right_blinker', 'turn_right'], label: '右转灯' },
   { key: 'turnSignal', aliases: ['turnsignal', 'turn_signal', 'signal'], label: '转向灯' },
-  { key: 'heading', aliases: ['heading', 'yaw', 'course'], label: '航向', unit: '°', digits: 1 },
-  { key: 'latitude', aliases: ['latitude', 'lat', 'gpslat'], label: '纬度', digits: 6 },
-  { key: 'longitude', aliases: ['longitude', 'lon', 'lng', 'gpslon'], label: '经度', digits: 6 },
+  { key: 'heading', aliases: ['heading', 'yaw', 'course', 'heading_deg'], label: '航向', unit: '°', digits: 1 },
+  { key: 'latitude', aliases: ['latitude', 'lat', 'gpslat', 'latitude_deg'], label: '纬度', digits: 6 },
+  { key: 'longitude', aliases: ['longitude', 'lon', 'lng', 'gpslon', 'longitude_deg'], label: '经度', digits: 6 },
   { key: 'elevation', aliases: ['elevation', 'altitude', 'height'], label: '海拔', unit: 'm', digits: 1 },
   { key: 'accelX', aliases: ['accelx', 'accel_x', 'ax'], label: '加速度X', unit: 'm/s2', digits: 2 },
   { key: 'accelY', aliases: ['accely', 'accel_y', 'ay'], label: '加速度Y', unit: 'm/s2', digits: 2 },
@@ -43,6 +49,25 @@ const FIELD_BY_ALIAS = FIELD_SPECS.reduce<Record<string, FieldSpec>>((prev, spec
 }, {})
 
 const TIME_KEYS = new Set(['time', 'timestamp', 'ts', 'time_ms', 'elapsed', 'elapsed_s', 'pts', 'sample_time'])
+const INTERNAL_EXTRA_KEYS = new Set([
+  'vehicle_speed_mps',
+  'vehicle_speed_kmh',
+  'accelerator_pedal_position',
+  'steering_wheel_angle',
+  'blinker_on_left',
+  'blinker_on_right',
+  'brake_applied',
+  'gear_state',
+  'autopilot_state',
+  'frame_seq_no',
+  'metadata_version',
+  'latitude_deg',
+  'longitude_deg',
+  'heading_deg',
+  'linear_acceleration_mps2_x',
+  'linear_acceleration_mps2_y',
+  'linear_acceleration_mps2_z',
+])
 
 function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9_]/g, '')
@@ -141,11 +166,20 @@ function parseRecordFields(record: Record<string, unknown>): Omit<DashcamPoint, 
       case 'speed':
         point.speed = val as number
         break
+      case 'speedMps':
+        point.speedMps = val as number
+        if (point.speed === undefined) {
+          point.speed = (val as number) * 3.6
+        }
+        break
       case 'steeringAngle':
         point.steeringAngle = val as number
         break
       case 'gear':
         point.gear = val as string | number
+        break
+      case 'autopilotState':
+        point.autopilotState = val as string | number
         break
       case 'brakePressed':
         point.brakePressed = val as boolean | string | number
@@ -153,8 +187,20 @@ function parseRecordFields(record: Record<string, unknown>): Omit<DashcamPoint, 
       case 'acceleratorPedal':
         point.acceleratorPedal = val as number
         break
+      case 'blinkerLeft':
+        point.blinkerLeft = Boolean(val)
+        break
+      case 'blinkerRight':
+        point.blinkerRight = Boolean(val)
+        break
       case 'turnSignal':
         point.turnSignal = val as string | number
+        break
+      case 'metadataVersion':
+        point.metadataVersion = val as number
+        break
+      case 'frameSeqNo':
+        point.frameSeqNo = val as number
         break
       case 'heading':
         point.heading = val as number
@@ -218,11 +264,27 @@ function parseRecordFields(record: Record<string, unknown>): Omit<DashcamPoint, 
   if (Object.keys(values).length) {
     point.values = values
   }
+  if (point.turnSignal === undefined) {
+    point.turnSignal = deriveTurnSignal(point.blinkerLeft, point.blinkerRight)
+  }
   const hasKnown = FIELD_SPECS.some(spec => point[spec.key] !== undefined)
   if (!hasKnown && !point.values) {
     return undefined
   }
   return point
+}
+
+function deriveTurnSignal(left?: boolean, right?: boolean): string | undefined {
+  if (left && right) {
+    return '双闪'
+  }
+  if (left) {
+    return '左'
+  }
+  if (right) {
+    return '右'
+  }
+  return undefined
 }
 
 function parseCsv(text: string, clipStartMs: number): DashcamPoint[] {
@@ -356,6 +418,7 @@ function formatBySpec(point: DashcamPoint): string[] {
 function formatExtraValues(point: DashcamPoint): string[] {
   const values = point.values ?? {}
   return Object.keys(values)
+    .filter(key => !/^f\d+$/.test(key) && !INTERNAL_EXTRA_KEYS.has(key))
     .sort((a, b) => a.localeCompare(b))
     .map(key => `${key} ${formatValue(values[key])}`)
 }
@@ -407,17 +470,21 @@ function findBox(data: DataView, parent: Mp4Box, type: string): Mp4Box | undefin
   return parseMp4Boxes(data, parent.start, parent.start + parent.size).find(item => item.type === type)
 }
 
-function readVarint(bytes: Uint8Array, start: number): { value?: number; next: number } {
-  let value = 0
-  let shift = 0
+function findTopBox(data: DataView, type: string): Mp4Box | undefined {
+  return parseMp4Boxes(data, 0, data.byteLength).find(item => item.type === type)
+}
+
+function readVarint(bytes: Uint8Array, start: number): { value?: bigint; next: number } {
+  let value = 0n
+  let shift = 0n
   let i = start
-  while (i < bytes.length && shift < 35) {
+  while (i < bytes.length && shift < 70n) {
     const current = bytes[i++]
-    value |= (current & 0x7f) << shift
+    value |= BigInt(current & 0x7f) << shift
     if ((current & 0x80) === 0) {
       return { value, next: i }
     }
-    shift += 7
+    shift += 7n
   }
   return { next: i }
 }
@@ -433,14 +500,15 @@ function removeRbspEscape(bytes: Uint8Array): Uint8Array {
   return new Uint8Array(result)
 }
 
-function parseSeiPayload(payload: Uint8Array): {
-  fields: Record<number, number>
-} | undefined {
-  const message = removeRbspEscape(payload)
-  if (message.length < 12 || message[0] !== 0x42 || message[1] !== 0x42 || message[2] !== 0x42 || message[3] !== 0x69) {
+function toSafeNumber(value: bigint): number | undefined {
+  const abs = value < 0 ? -value : value
+  if (abs > BigInt(Number.MAX_SAFE_INTEGER)) {
     return undefined
   }
-  const protobuf = message.slice(4)
+  return Number(value)
+}
+
+function parseSeiPayload(protobuf: Uint8Array): Record<number, number> | undefined {
   let index = 0
   const fields: Record<number, number> = {}
   while (index < protobuf.length) {
@@ -449,13 +517,16 @@ function parseSeiPayload(payload: Uint8Array): {
       break
     }
     index = key.next
-    const field = key.value >> 3
-    const wire = key.value & 7
+    const field = Number(key.value >> 3n)
+    const wire = Number(key.value & 7n)
     if (wire === 0) {
       const value = readVarint(protobuf, index)
       index = value.next
       if (value.value !== undefined) {
-        fields[field] = value.value
+        const parsed = toSafeNumber(value.value)
+        if (parsed !== undefined) {
+          fields[field] = parsed
+        }
       }
       continue
     }
@@ -480,10 +551,14 @@ function parseSeiPayload(payload: Uint8Array): {
     }
     if (wire === 2) {
       const len = readVarint(protobuf, index)
-      if (len.value === undefined) {
+      if (len.value === undefined || len.value < 0) {
         break
       }
-      index = len.next + len.value
+      const size = toSafeNumber(len.value)
+      if (size === undefined || size < 0) {
+        break
+      }
+      index = len.next + size
       if (index > protobuf.length) {
         break
       }
@@ -491,213 +566,269 @@ function parseSeiPayload(payload: Uint8Array): {
     }
     break
   }
-  return { fields }
+  return Object.keys(fields).length ? fields : undefined
 }
 
-function extractSeiPayloadFromSample(sample: Uint8Array, nalLengthSize: number): Uint8Array | undefined {
-  let offset = 0
-  while (offset + nalLengthSize <= sample.length) {
-    let nalSize = 0
-    for (let i = 0; i < nalLengthSize; i++) {
-      nalSize = (nalSize << 8) + sample[offset + i]
-    }
-    offset += nalLengthSize
-    if (nalSize <= 0 || offset + nalSize > sample.length) {
-      break
-    }
-    const nal = sample.slice(offset, offset + nalSize)
-    offset += nalSize
-    if ((nal[0] & 0x1f) !== 6) {
+function parseSeiFieldsFromNal(nal: Uint8Array): Record<number, number> | undefined {
+  if (!nal.length || (nal[0] & 0x1f) !== 6 || nal.length < 6) {
+    return undefined
+  }
+  let markerStart = -1
+  for (let i = 3; i < nal.length - 1; i++) {
+    const current = nal[i]
+    if (current === 0x42) {
+      if (markerStart === -1) {
+        markerStart = i
+      }
       continue
     }
-    let i = 1
-    let payloadType = 0
-    while (i < nal.length && nal[i] === 0xff) {
-      payloadType += 255
-      i += 1
+    if (current === 0x69 && markerStart !== -1) {
+      const protobuf = removeRbspEscape(nal.slice(i + 1, nal.length - 1))
+      return parseSeiPayload(protobuf)
     }
-    if (i >= nal.length) {
-      continue
-    }
-    payloadType += nal[i]
-    i += 1
-    let payloadSize = 0
-    while (i < nal.length && nal[i] === 0xff) {
-      payloadSize += 255
-      i += 1
-    }
-    if (i >= nal.length) {
-      continue
-    }
-    payloadSize += nal[i]
-    i += 1
-    if (payloadType !== 5 || i + payloadSize > nal.length) {
-      continue
-    }
-    return nal.slice(i, i + payloadSize)
+    markerStart = -1
   }
   return undefined
 }
 
+function parseFrameDurationsMs(data: DataView, mdia: Mp4Box, stbl: Mp4Box): number[] {
+  const mdhd = findBox(data, mdia, 'mdhd')
+  const stts = findBox(data, stbl, 'stts')
+  if (!mdhd || !stts) {
+    return []
+  }
+  const mdhdVersion = data.getUint8(mdhd.start)
+  const timescale = mdhdVersion === 1
+    ? data.getUint32(mdhd.start + 20)
+    : data.getUint32(mdhd.start + 12)
+  if (!timescale) {
+    return []
+  }
+  const entryCount = data.getUint32(stts.start + 4)
+  const durations: number[] = []
+  let offset = stts.start + 8
+  const sttsEnd = stts.start + stts.size
+  for (let i = 0; i < entryCount && offset + 8 <= sttsEnd; i++) {
+    const frameCount = data.getUint32(offset)
+    const delta = data.getUint32(offset + 4)
+    const ms = (delta / timescale) * 1000
+    for (let j = 0; j < frameCount; j++) {
+      durations.push(ms)
+    }
+    offset += 8
+  }
+  return durations
+}
+
+function findVideoTrack(data: DataView, moov: Mp4Box): {
+  stbl: Mp4Box
+  mdia: Mp4Box
+  avcC: Mp4Box
+} | undefined {
+  const traks = parseMp4Boxes(data, moov.start, moov.start + moov.size).filter(item => item.type === 'trak')
+  for (let i = 0; i < traks.length; i++) {
+    const mdia = findBox(data, traks[i], 'mdia')
+    const minf = mdia ? findBox(data, mdia, 'minf') : undefined
+    const stbl = minf ? findBox(data, minf, 'stbl') : undefined
+    const stsd = stbl ? findBox(data, stbl, 'stsd') : undefined
+    if (!mdia || !stbl || !stsd) {
+      continue
+    }
+    const sampleEntries = parseMp4Boxes(data, stsd.start + 8, stsd.start + stsd.size)
+    const avc = sampleEntries.find(item => item.type === 'avc1' || item.type === 'avc3')
+    // MP4 sample entry has a fixed header before child boxes.
+    // For avc1/avc3, avcC is placed after 78 bytes in sample entry payload.
+    const avcCSearchStart = avc ? avc.start + 78 : undefined
+    const avcC = avc && avcCSearchStart !== undefined && avcCSearchStart < avc.start + avc.size
+      ? parseMp4Boxes(data, avcCSearchStart, avc.start + avc.size).find(item => item.type === 'avcC')
+      : undefined
+    if (!avcC) {
+      continue
+    }
+    return { stbl, mdia, avcC }
+  }
+  return undefined
+}
+
+const GEAR_MAP: Record<number, string> = {
+  0: 'P',
+  1: 'D',
+  2: 'R',
+  3: 'N',
+}
+
+const AUTOPILOT_MAP: Record<number, string> = {
+  0: 'NONE',
+  1: 'SELF_DRIVING',
+  2: 'AUTOSTEER',
+  3: 'TACC',
+}
+
+function readFieldNumber(fields: Record<number, number>, fieldNo: number, fallback?: number): number | undefined {
+  const value = fields[fieldNo]
+  if (value === undefined || !Number.isFinite(value)) {
+    return fallback
+  }
+  return value
+}
+
+function readFieldBool(fields: Record<number, number>, fieldNo: number, fallback = false): boolean {
+  return Boolean(readFieldNumber(fields, fieldNo, fallback ? 1 : 0))
+}
+
+function addPointValue(values: Record<string, DashcamValue>, key: string, value: DashcamValue | undefined) {
+  if (value === undefined) {
+    return
+  }
+  values[key] = value
+}
+
+function buildPointFromFields(fields: Record<number, number>, timeMs: number): DashcamPoint {
+  const speedMpsRaw = readFieldNumber(fields, 4, 0) ?? 0
+  const speedMps = Math.abs(speedMpsRaw) < 1e-3 ? 0 : speedMpsRaw
+  const speed = speedMps * 3.6
+  const accelerator = readFieldNumber(fields, 5, 0) ?? 0
+  const steering = readFieldNumber(fields, 6, 0) ?? 0
+  const blinkerLeft = readFieldBool(fields, 7, false)
+  const blinkerRight = readFieldBool(fields, 8, false)
+  const brakeApplied = readFieldBool(fields, 9, false)
+  const gearRaw = Math.round(readFieldNumber(fields, 2, 0) ?? 0)
+  const autopilotRaw = Math.round(readFieldNumber(fields, 10, 0) ?? 0)
+  const point: DashcamPoint = {
+    t: Math.max(0, Math.round(timeMs)),
+    metadataVersion: readFieldNumber(fields, 1),
+    frameSeqNo: readFieldNumber(fields, 3),
+    speedMps,
+    speed,
+    acceleratorPedal: accelerator,
+    steeringAngle: steering,
+    gear: GEAR_MAP[gearRaw] ?? String(gearRaw),
+    autopilotState: AUTOPILOT_MAP[autopilotRaw] ?? String(autopilotRaw),
+    blinkerLeft,
+    blinkerRight,
+    brakePressed: brakeApplied,
+    turnSignal: deriveTurnSignal(blinkerLeft, blinkerRight),
+  }
+
+  const heading = readFieldNumber(fields, 13)
+  if (heading !== undefined) {
+    point.heading = heading
+  }
+  const lat = readFieldNumber(fields, 11)
+  if (lat !== undefined) {
+    point.latitude = lat
+  }
+  const lon = readFieldNumber(fields, 12)
+  if (lon !== undefined) {
+    point.longitude = lon
+  }
+  const accelX = readFieldNumber(fields, 14)
+  if (accelX !== undefined) {
+    point.accelX = accelX
+  }
+  const accelY = readFieldNumber(fields, 15)
+  if (accelY !== undefined) {
+    point.accelY = accelY
+  }
+  const accelZ = readFieldNumber(fields, 16)
+  if (accelZ !== undefined) {
+    point.accelZ = accelZ
+  }
+
+  const values: Record<string, DashcamValue> = {}
+  Object.keys(fields)
+    .map(key => Number(key))
+    .sort((a, b) => a - b)
+    .forEach((fieldNo) => {
+      values[`f${fieldNo}`] = fields[fieldNo]
+    })
+  addPointValue(values, 'vehicle_speed_mps', Number(speedMps.toFixed(6)))
+  addPointValue(values, 'vehicle_speed_kmh', Number(speed.toFixed(3)))
+  addPointValue(values, 'accelerator_pedal_position', Number(accelerator.toFixed(3)))
+  addPointValue(values, 'steering_wheel_angle', Number(steering.toFixed(3)))
+  addPointValue(values, 'blinker_on_left', blinkerLeft)
+  addPointValue(values, 'blinker_on_right', blinkerRight)
+  addPointValue(values, 'brake_applied', brakeApplied)
+  addPointValue(values, 'gear_state', gearRaw)
+  addPointValue(values, 'autopilot_state', autopilotRaw)
+  addPointValue(values, 'frame_seq_no', point.frameSeqNo)
+  addPointValue(values, 'metadata_version', point.metadataVersion)
+  if (point.latitude !== undefined) {
+    addPointValue(values, 'latitude_deg', Number(point.latitude.toFixed(7)))
+  }
+  if (point.longitude !== undefined) {
+    addPointValue(values, 'longitude_deg', Number(point.longitude.toFixed(7)))
+  }
+  if (point.heading !== undefined) {
+    addPointValue(values, 'heading_deg', Number(point.heading.toFixed(4)))
+  }
+  if (point.accelX !== undefined) {
+    addPointValue(values, 'linear_acceleration_mps2_x', Number(point.accelX.toFixed(6)))
+  }
+  if (point.accelY !== undefined) {
+    addPointValue(values, 'linear_acceleration_mps2_y', Number(point.accelY.toFixed(6)))
+  }
+  if (point.accelZ !== undefined) {
+    addPointValue(values, 'linear_acceleration_mps2_z', Number(point.accelZ.toFixed(6)))
+  }
+  if (Object.keys(values).length) {
+    point.values = values
+  }
+  return point
+}
+
 export function parseDashcamFromMp4(fileBuffer: ArrayBuffer): DashcamPoint[] {
   const data = new DataView(fileBuffer)
-  const top = parseMp4Boxes(data, 0, data.byteLength)
-  const moov = top.find(item => item.type === 'moov')
-  if (!moov) {
+  const moov = findTopBox(data, 'moov')
+  const mdat = findTopBox(data, 'mdat')
+  if (!moov || !mdat) {
     return []
   }
-  const trak = parseMp4Boxes(data, moov.start, moov.start + moov.size).find(item => item.type === 'trak')
-  if (!trak) {
+  const track = findVideoTrack(data, moov)
+  if (!track) {
     return []
   }
-  const mdia = findBox(data, trak, 'mdia')
-  const minf = mdia ? findBox(data, mdia, 'minf') : undefined
-  const stbl = minf ? findBox(data, minf, 'stbl') : undefined
-  const stsd = stbl ? findBox(data, stbl, 'stsd') : undefined
-  const stsc = stbl ? findBox(data, stbl, 'stsc') : undefined
-  const stsz = stbl ? findBox(data, stbl, 'stsz') : undefined
-  const stco = stbl ? findBox(data, stbl, 'stco') : undefined
-  if (!stsd || !stsc || !stsz || !stco) {
+  if (track.avcC.start + 5 > track.avcC.start + track.avcC.size) {
     return []
   }
+  const nalLengthSize = (data.getUint8(track.avcC.start + 4) & 0x03) + 1
+  const frameDurations = parseFrameDurationsMs(data, track.mdia, track.stbl)
+  const averageFrameDuration = frameDurations.length
+    ? frameDurations.reduce((total, item) => total + item, 0) / frameDurations.length
+    : 1000 / 36
 
-  const stsdStart = stsd.start
-  const entryCount = data.getUint32(stsdStart + 4)
-  if (entryCount < 1) {
-    return []
-  }
-  const sampleEntryOffset = stsdStart + 8
-  const avc1HeaderSize = 86
-  if (sampleEntryOffset + avc1HeaderSize > stsdStart + stsd.size) {
-    return []
-  }
-  const avcCOffset = sampleEntryOffset + avc1HeaderSize
-  if (avcCOffset + 9 > stsdStart + stsd.size) {
-    return []
-  }
-  // avcC box layout: [size(4)][type(4)][configurationVersion(1)][AVCProfileIndication(1)]
-  // [profile_compatibility(1)][AVCLevelIndication(1)][lengthSizeMinusOne(1)]...
-  const nalLengthSize = (data.getUint8(avcCOffset + 12) & 0x03) + 1
+  const points: DashcamPoint[] = []
+  let cursor = mdat.start
+  const mdatEnd = mdat.start + mdat.size
+  let pendingFields: Record<number, number> | undefined
+  let frameIndex = 0
+  let elapsedMs = 0
 
-  const stscCount = data.getUint32(stsc.start + 4)
-  const chunkRules: Array<{ firstChunk: number; samplesPerChunk: number }> = []
-  for (let i = 0; i < stscCount; i++) {
-    const base = stsc.start + 8 + i * 12
-    chunkRules.push({
-      firstChunk: data.getUint32(base),
-      samplesPerChunk: data.getUint32(base + 4),
-    })
-  }
-  const chunkCount = data.getUint32(stco.start + 4)
-  const chunkOffsets: number[] = []
-  for (let i = 0; i < chunkCount; i++) {
-    chunkOffsets.push(data.getUint32(stco.start + 8 + i * 4))
-  }
-  const defaultSampleSize = data.getUint32(stsz.start + 4)
-  const sampleCount = data.getUint32(stsz.start + 8)
-  const sampleSizes: number[] = []
-  for (let i = 0; i < sampleCount; i++) {
-    sampleSizes.push(defaultSampleSize || data.getUint32(stsz.start + 12 + i * 4))
-  }
-
-  const sampleOffsets: number[] = []
-  let sampleIndex = 0
-  for (let chunkIndex = 1; chunkIndex <= chunkOffsets.length; chunkIndex++) {
-    let rule = chunkRules[0]
-    for (let i = 0; i < chunkRules.length; i++) {
-      if (chunkRules[i].firstChunk <= chunkIndex) {
-        rule = chunkRules[i]
-      } else {
-        break
+  while (cursor + nalLengthSize <= mdatEnd) {
+    let nalSize = 0
+    for (let i = 0; i < nalLengthSize; i++) {
+      nalSize = (nalSize << 8) + data.getUint8(cursor + i)
+    }
+    cursor += nalLengthSize
+    if (nalSize < 1 || cursor + nalSize > mdatEnd) {
+      break
+    }
+    const nal = new Uint8Array(fileBuffer, cursor, nalSize)
+    const nalType = nal[0] & 0x1f
+    cursor += nalSize
+    if (nalType === 6) {
+      pendingFields = parseSeiFieldsFromNal(nal)
+      continue
+    }
+    if (nalType === 1 || nalType === 5) {
+      if (pendingFields) {
+        points.push(buildPointFromFields(pendingFields, elapsedMs))
+        pendingFields = undefined
       }
-    }
-    let offset = chunkOffsets[chunkIndex - 1]
-    for (let i = 0; i < rule.samplesPerChunk && sampleIndex < sampleSizes.length; i++) {
-      sampleOffsets.push(offset)
-      offset += sampleSizes[sampleIndex]
-      sampleIndex += 1
+      elapsedMs += frameDurations[frameIndex] ?? averageFrameDuration
+      frameIndex += 1
     }
   }
-
-  const rows: Array<{
-    frameIndex: number
-    fields: Record<number, number>
-  }> = []
-
-  for (let i = 0; i < sampleOffsets.length; i++) {
-    const sampleOffset = sampleOffsets[i]
-    const sampleSize = sampleSizes[i]
-    if (!sampleSize || sampleOffset + sampleSize > data.byteLength) {
-      continue
-    }
-    const sample = new Uint8Array(fileBuffer, sampleOffset, sampleSize)
-    const seiPayload = extractSeiPayloadFromSample(sample, nalLengthSize)
-    if (!seiPayload) {
-      continue
-    }
-    const parsed = parseSeiPayload(seiPayload)
-    if (!parsed) {
-      continue
-    }
-    rows.push({
-      frameIndex: i,
-      fields: parsed.fields,
-    })
-  }
-
-  if (!rows.length) {
-    return []
-  }
-
-  const validTicks = rows
-    .map(item => item.fields[3])
-    .filter((item): item is number => typeof item === 'number' && Number.isFinite(item))
-  const firstTick = validTicks.length ? Math.min(...validTicks) : undefined
-  const fps = 36
-
-  const points = rows.map((item) => {
-    const tick = item.fields[3]
-    const t = firstTick !== undefined && tick !== undefined
-      ? ((tick - firstTick) * 1000) / fps
-      : (item.frameIndex * 1000) / fps
-    const rawValues: Record<string, DashcamValue> = {}
-    Object.keys(item.fields)
-      .map(key => Number(key))
-      .sort((a, b) => a - b)
-      .forEach((fieldNo) => {
-        rawValues[`f${fieldNo}`] = item.fields[fieldNo]
-      })
-    const speedMs = item.fields[5]
-    const steering = item.fields[6]
-    const headingRaw = item.fields[4]
-    const accelX = item.fields[14]
-    const accelY = item.fields[15]
-    const point: DashcamPoint = {
-      t: Math.max(0, Math.round(t)),
-      values: Object.keys(rawValues).length ? rawValues : undefined,
-    }
-    if (speedMs !== undefined && speedMs > -1 && speedMs < 120) {
-      point.speed = speedMs * 3.6
-    }
-    if (steering !== undefined && steering > -900 && steering < 900) {
-      point.steeringAngle = steering
-    }
-    if (headingRaw !== undefined) {
-      if (headingRaw >= 0 && headingRaw <= Math.PI * 2 + 0.2) {
-        point.heading = (headingRaw * 180) / Math.PI
-      } else if (headingRaw >= 0 && headingRaw <= 360) {
-        point.heading = headingRaw
-      }
-    }
-    if (accelX !== undefined && accelX > -20 && accelX < 20) {
-      point.accelX = accelX
-    }
-    if (accelY !== undefined && accelY > -20 && accelY < 20) {
-      point.accelY = accelY
-    }
-    return point
-  })
-
   return mergeDashcamPoints(points)
 }
 
@@ -727,15 +858,20 @@ export function findDashcamPoint(points: DashcamPoint[] | undefined, currentSec:
     return undefined
   }
   const currentMs = Math.floor(currentSec * 1000)
-  let hit: DashcamPoint | undefined
+  let hit = points[0]
   for (let i = 0; i < points.length; i++) {
     if (points[i].t <= currentMs) {
       hit = points[i]
       continue
     }
+    const prevDiff = Math.abs(currentMs - hit.t)
+    const nextDiff = Math.abs(points[i].t - currentMs)
+    if (nextDiff < prevDiff) {
+      hit = points[i]
+    }
     break
   }
-  return hit ?? points[0]
+  return hit
 }
 
 export function formatDashcamText(point: DashcamPoint | undefined): string {

@@ -80,9 +80,15 @@ export interface Video {
 
 export interface DashcamPoint {
   t: number
+  metadataVersion?: number
+  frameSeqNo?: number
   speed?: number
+  speedMps?: number
   steeringAngle?: number
   gear?: string | number
+  autopilotState?: string | number
+  blinkerLeft?: boolean
+  blinkerRight?: boolean
   brakePressed?: boolean | string | number
   acceleratorPedal?: number
   turnSignal?: string | number
