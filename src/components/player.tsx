@@ -288,7 +288,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                   ))
                 }
               <div className={styles.time}>
-                {dayjs(currentVideo.time + currentTime * 1000).format('YYYY年MM月DD日 HH:mm:ss')}
+                {dayjs(currentVideo.time + currentTime * 1000).format('YYYY-MM-DD HH:mm')}
                 {props.videos && props.videos.length > 1 ? ` (${currentClipIndex + 1}/${props.videos.length})` : ''}
               </div>
               {dashcamText ? (

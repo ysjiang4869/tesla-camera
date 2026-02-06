@@ -16,6 +16,7 @@ import { readTextFile, readDir, readBinaryFile } from '@tauri-apps/api/fs'
 import {
   getClipPrefix, isDashcamMetaFile, mergeDashcamPoints, parseDashcamTelemetry,
 } from '../dashcam'
+import { getCachedVideoThumbnail } from '../thumbnail'
 
 interface FsSystemProps {
   onAccess: (accessFile: OriginVideoGroup[]) => void
@@ -31,7 +32,7 @@ function nameToTime(name: string): number {
 
 function nameToTitle(name: string): string {
   const time = nameToTime(name)
-  return dayjs(time).format('YYYY年MM月DD日 HH:mm:ss')
+  return dayjs(time).format('YYYY-MM-DD HH:mm')
 }
 
 function pathToType(path: string) {
@@ -128,8 +129,7 @@ async function buildVideoGroups(videos: OriginVideo[], eventByDir: Record<string
       continue
     }
     try {
-      const source = await first.src_f.get()
-      groups[i].thumbnail = source.url
+      groups[i].thumbnail = await getCachedVideoThumbnail(first.src_f.path, async () => (await first.src_f.get()).url)
     } catch {
       // ignore thumbnail failures
     }
