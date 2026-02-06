@@ -15,6 +15,8 @@ import { findDashcamPoint, formatDashcamDebugText, formatDashcamText } from '../
 import { type Video, CameraEnum } from '../model'
 
 const PLAYBACK_RATE_CYCLE = [1, 1.5, 2, 0.5]
+const DURATION_LOAD_CONCURRENCY = 4
+const EVENT_MARKER_VISUAL_HALF_WIDTH = 5
 
 const useStyles = makeStyles({
   root: {
@@ -89,6 +91,7 @@ const useStyles = makeStyles({
     position: 'relative',
     flexGrow: 1,
     minWidth: '320px',
+    overflow: 'hidden',
   },
   sliderTime: {
     minWidth: '62px',
@@ -124,13 +127,25 @@ const useStyles = makeStyles({
     '&::before': {
       content: '" "',
       position: 'absolute',
-      width: '8px',
-      height: '8px',
-      top: '-5px',
-      left: '-3px',
+      width: '6px',
+      height: '6px',
+      top: '-4px',
+      left: '50%',
+      transform: 'translateX(-50%)',
       borderRadius: '50%',
       backgroundColor: tokens.colorPaletteRedForeground1,
     },
+  },
+  debugPanel: {
+    marginTop: '8px',
+    color: tokens.colorNeutralForeground3,
+    fontSize: '12px',
+    lineHeight: '16px',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-all',
+    ...shorthands.padding('6px', '8px'),
+    backgroundColor: tokens.colorNeutralBackground2,
+    ...shorthands.borderRadius('4px'),
   },
   empty: {},
   playFocusInput: {
@@ -147,7 +162,7 @@ interface PlayerProps {
   onVideoChange?: (video: Video) => void
 }
 
-function getSrc(camera: CameraEnum, video: Video): string {
+function getCameraSrc(camera: CameraEnum, video: Video): string | undefined {
   switch (camera) {
     case CameraEnum.前:
       return video.src_f
@@ -158,6 +173,14 @@ function getSrc(camera: CameraEnum, video: Video): string {
     case CameraEnum.右:
       return video.src_r
   }
+}
+
+function getFirstAvailableSrc(video: Video): string | undefined {
+  return video.src_f || video.src_b || video.src_l || video.src_r
+}
+
+function getSrc(camera: CameraEnum, video: Video): string {
+  return getCameraSrc(camera, video) || getFirstAvailableSrc(video) || ''
 }
 
 function normalizeDuration(value?: number): number {
@@ -267,12 +290,20 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   const [playbackRate, setPlaybackRate] = useState(1)
   const [clipDurations, setClipDurations] = useState<number[]>([])
   const videoRef = useRef<HTMLVideoElement>(null)
+  const sliderWrapRef = useRef<HTMLDivElement>(null)
+  const eventMarkerRef = useRef<HTMLDivElement>(null)
   const inputIsFocus = useRef(false)
+  const [sliderWrapWidth, setSliderWrapWidth] = useState(0)
+  const [sliderRailLeft, setSliderRailLeft] = useState(0)
+  const [sliderRailWidth, setSliderRailWidth] = useState(0)
+  const [eventMarkerRectText, setEventMarkerRectText] = useState('n/a')
   const durationLoadTokenRef = useRef(0)
   const autoPlayAfterSwitchRef = useRef(false)
   const playIntentRef = useRef(false)
   const { delayPlay } = useDelayPlay()
-  const currentVideo = props.videos?.[currentClipIndex]
+  const videos = useMemo(() => (props.videos ?? []).filter(video => Boolean(getFirstAvailableSrc(video))), [props.videos])
+  const currentVideo = videos[currentClipIndex]
+  const showPlayerDebug = localStorage.getItem('playerDebug') === '1'
   const dashcamPoint = findDashcamPoint(currentVideo?.dashcam, currentTime)
   const dashcamText = formatDashcamText(dashcamPoint)
   const showDashcamDebug = localStorage.getItem('dashcamDebug') === '1'
@@ -293,41 +324,159 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   )
   const currentClipDuration = normalizeDuration(clipDurations[currentClipIndex])
   const sliderMax = totalDuration > 0 ? totalDuration : 0.1
+  const filenameNominalClipMs = useMemo(() => {
+    if (videos.length < 2) {
+      return 60000
+    }
+    const diffs = videos
+      .slice(1)
+      .map((video, index) => video.time - videos[index].time)
+      .filter(diff => diff > 1000 && diff < 300000)
+      .sort((a, b) => a - b)
+    if (!diffs.length) {
+      return 60000
+    }
+    return diffs[Math.floor(diffs.length / 2)]
+  }, [videos])
+  const filenameTimelineTotalMs = useMemo(() => {
+    if (!videos.length) {
+      return 0
+    }
+    if (videos.length === 1) {
+      return filenameNominalClipMs
+    }
+    return Math.max(1, videos[videos.length - 1].time - videos[0].time + filenameNominalClipMs)
+  }, [filenameNominalClipMs, videos])
+  const eventTimelineByFilename = useMemo(() => {
+    if (!props.eventTime || !videos.length || filenameTimelineTotalMs <= 0) {
+      return undefined
+    }
+    const offsetMs = props.eventTime - videos[0].time
+    const ratio = Math.max(0, Math.min(offsetMs / filenameTimelineTotalMs, 1))
+    return {
+      ratio,
+      seconds: Math.max(0, offsetMs / 1000),
+    }
+  }, [filenameTimelineTotalMs, props.eventTime, videos])
   const eventTimelineTime = useMemo(() => {
-    if (!props.eventTime || !props.videos?.length || !clipDurations.length) {
+    if (!eventTimelineByFilename) {
       return undefined
     }
-    const eventMs = props.eventTime
-    const videos = props.videos
-    let clipIndex = videos.length - 1
-    if (eventMs <= videos[0].time) {
-      clipIndex = 0
-    } else {
-      for (let i = 0; i < videos.length - 1; i++) {
-        if (eventMs < videos[i + 1].time) {
-          clipIndex = i
-          break
-        }
-      }
-    }
-    const clipDuration = normalizeDuration(clipDurations[clipIndex])
-    const clipStart = clipStarts[clipIndex] ?? 0
-    const offsetSeconds = Math.max(
-      0,
-      Math.min(
-        (eventMs - videos[clipIndex].time) / 1000,
-        Math.max(clipDuration - 0.01, 0),
-      ),
-    )
-    return Math.min(Math.max(clipStart + offsetSeconds, 0), sliderMax)
-  }, [clipDurations, clipStarts, props.eventTime, props.videos, sliderMax])
+    return eventTimelineByFilename.seconds
+  }, [eventTimelineByFilename])
   const eventMarkerLeft = useMemo(() => {
-    if (eventTimelineTime === undefined || totalDuration <= 0) {
+    if (!eventTimelineByFilename || sliderWrapWidth <= 0) {
       return undefined
     }
-    const percent = (eventTimelineTime / totalDuration) * 100
-    return `${Math.max(0, Math.min(percent, 100))}%`
-  }, [eventTimelineTime, totalDuration])
+    const ratio = eventTimelineByFilename.ratio
+    const hasRail = sliderRailWidth > 0
+    const horizontalPadding = 14
+    const baseLeft = hasRail ? sliderRailLeft : horizontalPadding
+    const usableWidth = hasRail ? sliderRailWidth : Math.max(sliderWrapWidth - horizontalPadding * 2, 1)
+    const markerHalfWidth = EVENT_MARKER_VISUAL_HALF_WIDTH
+    const center = baseLeft + usableWidth * ratio
+    const safeCenter = Math.max(baseLeft + markerHalfWidth, Math.min(center, baseLeft + usableWidth - markerHalfWidth))
+    return `${safeCenter}px`
+  }, [eventTimelineByFilename, sliderRailLeft, sliderRailWidth, sliderWrapWidth])
+
+  useEffect(() => {
+    const wrap = sliderWrapRef.current
+    if (!wrap) {
+      return
+    }
+    const update = () => {
+      setSliderWrapWidth(wrap.clientWidth || 0)
+      const wrapRect = wrap.getBoundingClientRect()
+      const rail = wrap.querySelector('.fui-Slider__rail') as HTMLElement | null
+      if (!rail) {
+        setSliderRailLeft(0)
+        setSliderRailWidth(0)
+        return
+      }
+      const railRect = rail.getBoundingClientRect()
+      const left = Math.max(0, railRect.left - wrapRect.left)
+      setSliderRailLeft(left)
+      setSliderRailWidth(Math.max(0, railRect.width))
+    }
+    update()
+    let observer: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => update())
+      observer.observe(wrap)
+    }
+    window.addEventListener('resize', update)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [videos.length])
+
+  useEffect(() => {
+    if (!showPlayerDebug) {
+      return
+    }
+    const wrap = sliderWrapRef.current
+    const rail = wrap?.querySelector('.fui-Slider__rail') as HTMLElement | null
+    const marker = eventMarkerRef.current
+    if (!wrap || !marker) {
+      setEventMarkerRectText('n/a')
+      return
+    }
+    const wrapRect = wrap.getBoundingClientRect()
+    const railRect = rail?.getBoundingClientRect()
+    const markerRect = marker.getBoundingClientRect()
+    const outside = markerRect.left < wrapRect.left || markerRect.right > wrapRect.right
+    const railOutside = railRect ? markerRect.left < railRect.left || markerRect.right > railRect.right : false
+    setEventMarkerRectText(
+      `wrap=[${wrapRect.left.toFixed(1)},${wrapRect.right.toFixed(1)}], rail=${railRect ? `[${railRect.left.toFixed(1)},${railRect.right.toFixed(1)}]` : 'n/a'}, marker=[${markerRect.left.toFixed(1)},${markerRect.right.toFixed(1)}], outside=${outside}, railOutside=${railOutside}`,
+    )
+  }, [currentClipIndex, currentTime, eventMarkerLeft, showPlayerDebug, sliderWrapWidth, sliderRailLeft, sliderRailWidth])
+
+  useEffect(() => {
+    if (!showPlayerDebug) {
+      return
+    }
+    // eslint-disable-next-line no-console
+    console.log('[player-debug]', {
+      currentClipIndex,
+      videosLength: videos.length,
+      currentTime,
+      currentTimelineTime,
+      sliderMax,
+      totalDuration,
+      eventTime: props.eventTime,
+      eventTimelineTime,
+      eventMarkerLeft,
+      sliderWrapWidth,
+      sliderRailLeft,
+      sliderRailWidth,
+      filenameNominalClipMs,
+      filenameTimelineTotalMs,
+      currentClipDuration: clipDurations[currentClipIndex],
+      currentClipStart: clipStarts[currentClipIndex],
+      currentSrc: currentVideo ? getSrc(currentCamera, currentVideo) : '',
+    })
+  }, [
+    clipDurations,
+    clipStarts,
+    currentCamera,
+    currentClipIndex,
+    currentTime,
+    currentTimelineTime,
+    currentVideo,
+    eventMarkerLeft,
+    eventTimelineTime,
+    filenameNominalClipMs,
+    filenameTimelineTotalMs,
+    props.eventTime,
+    showPlayerDebug,
+    sliderMax,
+    sliderRailLeft,
+    sliderRailWidth,
+    sliderWrapWidth,
+    totalDuration,
+    videos.length,
+  ])
 
   useEffect(() => {
     setCurrentClipIndex(0)
@@ -336,25 +485,33 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
     setPaused(true)
     setPlaybackRate(1)
     setCurrentCamera(CameraEnum.前)
-    setClipDurations(buildInitialClipDurations(props.videos))
+    setClipDurations(buildInitialClipDurations(videos))
     durationLoadTokenRef.current += 1
     autoPlayAfterSwitchRef.current = false
     playIntentRef.current = false
 
-    if (!videoRef.current || !props.videos?.length) {
+    if (!videoRef.current || !videos.length) {
       return
     }
 
     videoRef.current.pause()
-    videoRef.current.src = getSrc(CameraEnum.前, props.videos[0])
+    videoRef.current.src = getSrc(CameraEnum.前, videos[0])
     videoRef.current.currentTime = 0
 
     const currentToken = durationLoadTokenRef.current
-    props.videos.forEach((video, index) => {
-      void loadClipDuration(getSrc(CameraEnum.前, video)).then((duration) => {
+    const workerCount = Math.min(DURATION_LOAD_CONCURRENCY, videos.length)
+    let cursor = 0
+    const worker = async () => {
+      while (currentToken === durationLoadTokenRef.current) {
+        const index = cursor
+        cursor += 1
+        if (index >= videos.length) {
+          return
+        }
+        const duration = await loadClipDuration(getSrc(CameraEnum.前, videos[index]))
         const nextDuration = normalizeDuration(duration)
         if (!nextDuration || currentToken !== durationLoadTokenRef.current) {
-          return
+          continue
         }
         setClipDurations((prev) => {
           if (!prev.length || index >= prev.length) {
@@ -367,9 +524,12 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
           next[index] = nextDuration
           return next
         })
-      })
-    })
-  }, [props.videos])
+      }
+    }
+    for (let i = 0; i < workerCount; i++) {
+      void worker()
+    }
+  }, [videos])
 
   useEffect(() => {
     setCurrentTimelineTime((clipStarts[currentClipIndex] ?? 0) + currentTime)
@@ -381,10 +541,10 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   }, [playbackRate, currentClipIndex])
 
   function switchToClip(nextIndex: number, autoplay: boolean, startTime = 0) {
-    if (!videoRef.current || !props.videos?.[nextIndex]) {
+    if (!videoRef.current || !videos[nextIndex]) {
       return
     }
-    const nextVideo = props.videos[nextIndex]
+    const nextVideo = videos[nextIndex]
     const nextDuration = normalizeDuration(clipDurations[nextIndex]) || 0
     const safeTime = nextDuration
       ? Math.min(Math.max(startTime, 0), Math.max(nextDuration - 0.01, 0))
@@ -412,12 +572,20 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
     void videoRef.current.play().catch(() => {
       delayPlay(videoRef.current as HTMLVideoElement)
     })
+    if (showPlayerDebug) {
+      // eslint-disable-next-line no-console
+      console.log('[player-debug] onCanPlay', { clipIndex: currentClipIndex, currentTime: videoRef.current.currentTime })
+    }
   }
 
   function seekTimeline(nextTimelineTime: number) {
-    if (!videoRef.current || !props.videos?.length) return
+    if (!videoRef.current || !videos.length) return
     const clamped = Math.min(Math.max(nextTimelineTime, 0), sliderMax)
     const { index, time } = locateClipByTimelineTime(clamped, clipDurations)
+    if (showPlayerDebug) {
+      // eslint-disable-next-line no-console
+      console.log('[player-debug] seekTimeline', { nextTimelineTime, clamped, index, time, currentClipIndex, sliderMax })
+    }
     const autoplay = playIntentRef.current
     if (index === currentClipIndex) {
       videoRef.current.pause()
@@ -489,7 +657,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
     const time = videoRef.current.currentTime
     if (duration && time >= duration - 0.05) {
       const nextIndex = currentClipIndex + 1
-      if (props.videos && nextIndex < props.videos.length) {
+      if (nextIndex < videos.length) {
         switchToClip(nextIndex, playIntentRef.current)
         return
       }
@@ -539,6 +707,23 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
     })
   }
 
+  function onVideoError() {
+    if (!videos.length) {
+      return
+    }
+    const nextIndex = currentClipIndex + 1
+    if (showPlayerDebug) {
+      // eslint-disable-next-line no-console
+      console.log('[player-debug] onVideoError', { currentClipIndex, nextIndex, videosLength: videos.length })
+    }
+    if (nextIndex < videos.length) {
+      switchToClip(nextIndex, playIntentRef.current)
+      return
+    }
+    playIntentRef.current = false
+    setPaused(true)
+  }
+
   function onPlayFocus() {
     inputIsFocus.current = true
   }
@@ -559,6 +744,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                 id="player"
                 ref={videoRef}
                 onCanPlay={onCanPlay}
+                onError={onVideoError}
                 onLoadedMetadata={onLoadedMetadata}
                 onPause={() => setPaused(true)}
                 onPlay={() => setPaused(false)}
@@ -613,7 +799,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                 </Button>
               </div>
               <div className={styles.sliderTime}>{fmtTime(currentTimelineTime)}</div>
-              <div className={styles.sliderWrap}>
+              <div className={styles.sliderWrap} ref={sliderWrapRef}>
                 <Slider
                   className={styles.slider}
                   max={sliderMax}
@@ -621,10 +807,23 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                   value={Math.min(currentTimelineTime, sliderMax)}
                   onChange={(_, data) => seekTimeline(Number(data.value))}
                 />
-                {eventMarkerLeft ? <div className={styles.eventMarker} style={{ left: eventMarkerLeft }} /> : null}
+                {eventMarkerLeft ? <div className={styles.eventMarker} ref={eventMarkerRef} style={{ left: eventMarkerLeft }} /> : null}
               </div>
               <div className={styles.sliderTime}>{fmtTime(totalDuration || currentClipDuration)}</div>
             </div>
+            {showPlayerDebug ? (
+              <div className={styles.debugPanel}>
+                {`debug
+clip=${currentClipIndex + 1}/${videos.length}
+currentTime=${currentTime.toFixed(3)}s timeline=${currentTimelineTime.toFixed(3)}s max=${sliderMax.toFixed(3)}s
+eventTime=${props.eventTime ?? '-'} eventTimeline=${eventTimelineTime?.toFixed(3) ?? '-'} markerLeft=${eventMarkerLeft ?? '-'}
+sliderWrapWidth=${sliderWrapWidth}px
+sliderRailLeft=${sliderRailLeft.toFixed(2)}px sliderRailWidth=${sliderRailWidth.toFixed(2)}px
+filenameNominalClipMs=${filenameNominalClipMs} filenameTimelineTotalMs=${filenameTimelineTotalMs}
+clipStart=${(clipStarts[currentClipIndex] ?? 0).toFixed(3)}s clipDuration=${(clipDurations[currentClipIndex] ?? 0).toFixed(3)}s
+${eventMarkerRectText}`}
+              </div>
+            ) : null}
             <input
               autoFocus
               className={styles.playFocusInput}
