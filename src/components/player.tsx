@@ -9,6 +9,7 @@ import { Pause24Filled, Play24Filled } from '@fluentui/react-icons'
 import MiniPlay from './mini-player'
 import dayjs from 'dayjs'
 import { useDelayPlay } from '../tool'
+import { findDashcamPoint, formatDashcamText } from '../dashcam'
 
 import { type Video, CameraEnum } from '../model'
 
@@ -45,6 +46,23 @@ const useStyles = makeStyles({
     fontWeight: 500,
     ...shorthands.padding('4px', '8px'),
     letterSpacing: '2px',
+    backgroundColor: tokens.colorNeutralStencil1Alpha,
+    ...shorthands.borderRadius('2px'),
+  },
+  dashcam: {
+    position: 'absolute',
+    left: '50%',
+    bottom: '40px',
+    transform: 'translateX(-50%)',
+    textAlign: 'center',
+    minWidth: '280px',
+    maxWidth: '90%',
+    color: tokens.colorNeutralBackground1Hover,
+    fontSize: '16px',
+    fontWeight: 500,
+    lineHeight: '22px',
+    whiteSpace: 'normal',
+    ...shorthands.padding('4px', '10px'),
     backgroundColor: tokens.colorNeutralStencil1Alpha,
     ...shorthands.borderRadius('2px'),
   },
@@ -109,6 +127,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const inputIsFocus = useRef(false)
   const { delayPlay } = useDelayPlay()
+  const dashcamText = formatDashcamText(findDashcamPoint(props.video?.dashcam, currentTime))
   function onKeyUp(e: Parameters<React.KeyboardEventHandler>[0]) {
     e.preventDefault()
     switch (e.code) {
@@ -136,12 +155,12 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
     }
   }
   function onSelectCamera(val: CameraEnum) {
-    if (!videoRef.current) return
+    if (!videoRef.current || !props.video) return
     setCurrentCamera(val)
     const prePaused = videoRef.current.paused
     const currentTime = videoRef.current.currentTime
     videoRef.current.pause()
-    videoRef.current.src = getSrc(val, props.video!)
+    videoRef.current.src = getSrc(val, props.video)
     videoRef.current.currentTime = currentTime
     if (!prePaused) {
       delayPlay(videoRef.current)
@@ -212,7 +231,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                       isActive={currentCamera === camera}
                       key={camera}
                       paused={paused}
-                      src={getSrc(camera, props.video!)}
+                      src={getSrc(camera, props.video)}
                       onClick={() => onSelectCamera(camera)}
                     />
                   ))
@@ -220,6 +239,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
               <div className={styles.time}>
                 {dayjs(props.video.time + currentTime * 1000).format('YYYY年MM月DD日 HH:mm:ss')}
               </div>
+              {dashcamText ? <div className={styles.dashcam}>{dashcamText}</div> : null}
             </label>
             <div className={styles.controlWrap}>
               {

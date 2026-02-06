@@ -13,6 +13,9 @@ import {
 import { convertFileSrc } from '@tauri-apps/api/tauri'
 import { open } from '@tauri-apps/api/dialog'
 import { readTextFile, readDir } from '@tauri-apps/api/fs'
+import {
+  getClipPrefix, isDashcamMetaFile, mergeDashcamPoints, parseDashcamTelemetry,
+} from '../dashcam'
 
 interface FsSystemProps {
   onAccess: (accessFile: OriginVideo[]) => void
@@ -113,11 +116,33 @@ const FsSystem: React.FC<FsSystemProps> = props => {
     readDir(teslaCamDir as string, { recursive: true }).then(async res => {
       const files = getDirFiles(res as TauriFile[])
       const videos = convertVideoFiles(files)
+      const videoByPrefix = videos.reduce<Record<string, OriginVideo>>((prev, item) => {
+        const prefix = dayjs(item.time).format('YYYY-MM-DD_HH-mm-ss')
+        prev[prefix] = item
+        return prev
+      }, {})
       const eventsFiles = files.filter(({ path }) => /.+event.json$/.test(path))
+      const dashcamFiles = files.filter(({ path }) => isDashcamMetaFile(path))
       let events: EventJson[] = []
       for (let i = 0; i < eventsFiles.length; i++) {
         const eventJsonText = await readTextFile(eventsFiles[i].path)
         events.push(JSON.parse(eventJsonText))
+      }
+      for (let i = 0; i < dashcamFiles.length; i++) {
+        const file = dashcamFiles[i]
+        const prefix = getClipPrefix(file.name) ?? getClipPrefix(file.path)
+        if (!prefix) {
+          continue
+        }
+        const current = videoByPrefix[prefix]
+        if (!current) {
+          continue
+        }
+        const text = await readTextFile(file.path)
+        const points = parseDashcamTelemetry(text, file.path, current.time)
+        if (points.length) {
+          current.dashcam = mergeDashcamPoints(current.dashcam, points)
+        }
       }
       events = events.sort((a, b) => dayjs(a.timestamp).valueOf() - dayjs(b.timestamp).valueOf())
       const newVideos = videos.sort((a, b) => a.time - b.time)

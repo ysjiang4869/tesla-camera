@@ -9,6 +9,9 @@ import dayjs from 'dayjs'
 import {
   type OriginVideo, TypeEnum, type VideoFile, type EventJson, type FileData,
 } from '../model'
+import {
+  getClipPrefix, isDashcamMetaFile, mergeDashcamPoints, parseDashcamTelemetry,
+} from '../dashcam'
 
 interface DirectoryAccessProps {
   onAccess: (accessFile: OriginVideo[]) => void
@@ -104,11 +107,33 @@ const DirectoryAccess: React.FC<React.PropsWithChildren<DirectoryAccessProps>> =
     const dirHandle = await window.showDirectoryPicker()
     const files = await getDirFiles(dirHandle)
     const videos = convertFiles(files)
+    const videoByPrefix = videos.reduce<Record<string, OriginVideo>>((prev, item) => {
+      const prefix = dayjs(item.time).format('YYYY-MM-DD_HH-mm-ss')
+      prev[prefix] = item
+      return prev
+    }, {})
     const eventsFiles = files.filter(({ path }) => /.+event.json$/.test(path))
+    const dashcamFiles = files.filter(({ path }) => isDashcamMetaFile(path))
     let events: EventJson[] = []
     for (let i = 0; i < eventsFiles.length; i++) {
       const file = await eventsFiles[i].fs.getFile()
       events.push(JSON.parse(await file.text()))
+    }
+    for (let i = 0; i < dashcamFiles.length; i++) {
+      const file = dashcamFiles[i]
+      const prefix = getClipPrefix(file.fs.name) ?? getClipPrefix(file.path)
+      if (!prefix) {
+        continue
+      }
+      const current = videoByPrefix[prefix]
+      if (!current) {
+        continue
+      }
+      const content = await file.fs.getFile()
+      const points = parseDashcamTelemetry(await content.text(), file.path, current.time)
+      if (points.length) {
+        current.dashcam = mergeDashcamPoints(current.dashcam, points)
+      }
     }
     events = events.sort((a, b) => dayjs(a.timestamp).valueOf() - dayjs(b.timestamp).valueOf())
     const newVideos = videos.sort((a, b) => a.time - b.time)

@@ -20,16 +20,19 @@ import {
   ToastBody,
   makeStyles,
   tokens,
+  Checkbox,
 } from '@fluentui/react-components'
 import { ResizeVideo24Filled } from '@fluentui/react-icons'
 import { type Video, type ExportTaskType, ExportStatusEnum } from '../model'
 import { open } from '@tauri-apps/api/dialog'
 import { Command } from '@tauri-apps/api/shell'
 import { getName } from '@tauri-apps/api/app'
-import { resolveResource } from '@tauri-apps/api/path'
+import { resolveResource, tempDir } from '@tauri-apps/api/path'
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification'
+import { writeTextFile } from '@tauri-apps/api/fs'
 import ExportTask from './export-task'
 import { durationToMs } from '../tool'
+import { buildDashcamSrt, escapeFfmpegPath } from '../dashcam'
 
 interface FfmpegExportProps {
   video: Video
@@ -78,6 +81,7 @@ const doTask = async (
   camera: CameraType,
   video: Video,
   exportDir: string,
+  includeDashcam: boolean,
   log: (arg: {
     path: string
     name: string
@@ -87,13 +91,24 @@ const doTask = async (
   }) => void,
 ) => {
   const { path: filePath, name: fileName } = getFile(camera, video)
+  const filters = [
+    `drawtext=fontsize=52:fontcolor=white:box=1:boxborderw=10:x=10:y=10:boxcolor=black@0.4:text='%{pts\\:localtime\\:${video.time / 1000}}'`,
+  ]
+  if (includeDashcam && video.dashcam?.length) {
+    const srt = buildDashcamSrt(video.dashcam)
+    if (srt) {
+      const srtPath = `${await tempDir()}tesla-camera-dashcam-${video.time}-${camera}.srt`
+      await writeTextFile(srtPath, srt)
+      filters.push(`subtitles='${escapeFfmpegPath(srtPath)}':force_style='FontSize=20,BorderStyle=3,Outline=1'`)
+    }
+  }
   const command = Command.sidecar(
     'binaries/ffmpeg',
     [
       '-y',
       '-i', filePath,
       '-progress', '-', '-nostats',
-      '-vf', `drawtext=fontsize=52:fontcolor=white:box=1:boxborderw=10:x=10:y=10:boxcolor=black@0.4:text='%{pts\\:localtime\\:${video.time / 1000}}'`,
+      '-vf', filters.join(','),
       `${exportDir}/${fileName}`,
     ],
   )
@@ -149,6 +164,7 @@ const FfmpegExport: React.FC<FfmpegExportProps> = (props) => {
   const tempTasks = useRef(tasks)
   const [exportDir, setExportDir] = useState(localStorage.getItem('exportDir') ?? '')
   const [camera, setCamera] = useState<CameraType>(localStorage.getItem('camera') as CameraType ?? 'f')
+  const [includeDashcam, setIncludeDashcam] = useState<boolean>(localStorage.getItem('includeDashcam') === '1')
   const toasterId = useId('toaster')
   const { dispatchToast } = useToastController(toasterId)
   const styles = useStyles()
@@ -204,6 +220,7 @@ const FfmpegExport: React.FC<FfmpegExportProps> = (props) => {
       camera,
       props.video,
       exportDir,
+      includeDashcam,
       async ({
         path, status, log, exportDir, name,
       }) => {
@@ -352,6 +369,17 @@ const FfmpegExport: React.FC<FfmpegExportProps> = (props) => {
                         >选择目录
                         </Button>
                       </div>
+                    </Field>
+                    <Field label="叠加信息">
+                      <Checkbox
+                        checked={includeDashcam}
+                        disabled={!props.video.dashcam?.length}
+                        label={props.video.dashcam?.length ? '包含 Dashcam 遥测信息（车速/方向盘/位置等）' : '未发现Dashcam信息'}
+                        onChange={(_, data) => {
+                          setIncludeDashcam(!!data.checked)
+                          localStorage.setItem('includeDashcam', data.checked ? '1' : '0')
+                        }}
+                      />
                     </Field>
                   </DialogContent>
                   <DialogActions>

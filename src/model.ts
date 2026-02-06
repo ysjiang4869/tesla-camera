@@ -44,6 +44,7 @@ export interface OriginVideo {
   src_r: FileData
   src_l: FileData
   event?: number
+  dashcam?: DashcamPoint[]
 }
 
 export interface OriginFSVideo {
@@ -73,7 +74,34 @@ export interface Video {
   src_b_path: string
   src_r_path: string
   src_l_path: string
+  dashcam?: DashcamPoint[]
 }
+
+export interface DashcamPoint {
+  t: number
+  speed?: number
+  steeringAngle?: number
+  gear?: string | number
+  brakePressed?: boolean | string | number
+  acceleratorPedal?: number
+  turnSignal?: string | number
+  heading?: number
+  latitude?: number
+  longitude?: number
+  elevation?: number
+  accelX?: number
+  accelY?: number
+  accelZ?: number
+  pitch?: number
+  roll?: number
+  yawRate?: number
+  odometer?: number
+  batteryLevel?: number
+  powerKw?: number
+  values?: Record<string, DashcamValue>
+}
+
+export type DashcamValue = string | number | boolean
 
 export interface ModelState {
   type: TypeEnum

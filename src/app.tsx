@@ -195,6 +195,7 @@ function App() {
         src_r: src_r_file.url,
         src_r_name: src_r_file.name,
         src_r_path: origin.src_r.path,
+        dashcam: origin.dashcam,
       },
     })
   }
