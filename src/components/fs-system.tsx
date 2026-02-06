@@ -7,7 +7,7 @@ import {
 import { FolderAdd24Regular } from '@fluentui/react-icons'
 import dayjs from 'dayjs'
 import {
-  type OriginVideo, TypeEnum, type TauriFile, type EventJson,
+  type OriginVideo, type OriginVideoGroup, TypeEnum, type TauriFile, type EventJson,
   type FileData,
 } from '../model'
 import { convertFileSrc } from '@tauri-apps/api/tauri'
@@ -18,7 +18,7 @@ import {
 } from '../dashcam'
 
 interface FsSystemProps {
-  onAccess: (accessFile: OriginVideo[]) => void
+  onAccess: (accessFile: OriginVideoGroup[]) => void
 }
 
 function nameToTime(name: string): number {
@@ -57,6 +57,84 @@ function getDirFiles(files: TauriFile[]) {
     }
   })
   return result
+}
+
+function normalizeDirPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  return normalized.endsWith('/') ? normalized : `${normalized}/`
+}
+
+function getParentDir(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const idx = normalized.lastIndexOf('/')
+  if (idx < 0) {
+    return '/'
+  }
+  return `${normalized.slice(0, idx + 1)}`
+}
+
+function getDirBaseName(dir: string): string {
+  const normalized = normalizeDirPath(dir)
+  const trimmed = normalized.endsWith('/') ? normalized.slice(0, -1) : normalized
+  const idx = trimmed.lastIndexOf('/')
+  return idx > -1 ? trimmed.slice(idx + 1) : trimmed
+}
+
+function toNumber(value?: string): number | undefined {
+  if (!value) {
+    return undefined
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+async function buildVideoGroups(videos: OriginVideo[], eventByDir: Record<string, EventJson>): Promise<OriginVideoGroup[]> {
+  const map: Record<string, OriginVideoGroup> = {}
+  videos.forEach((item) => {
+    const key = normalizeDirPath(item.dir)
+    if (!map[key]) {
+      map[key] = {
+        id: key,
+        title: getDirBaseName(item.dir),
+        time: item.time,
+        type: item.type,
+        dir: item.dir,
+        clips: [],
+      }
+    }
+    const group = map[key]
+    group.clips.push(item)
+    if (item.time < group.time) {
+      group.time = item.time
+    }
+  })
+  const groups = Object.values(map)
+    .map((item) => {
+      item.clips = item.clips.sort((a, b) => a.time - b.time)
+      const event = eventByDir[item.id]
+      if (event) {
+        item.event = dayjs(event.timestamp).valueOf()
+        item.city = event.city
+        item.latitude = toNumber(event.est_lat)
+        item.longitude = toNumber(event.est_lon)
+        item.reason = event.reason
+      }
+      return item
+    })
+    .sort((a, b) => b.time - a.time)
+  for (let i = 0; i < groups.length; i++) {
+    const first = groups[i].clips[0]
+    if (!first) {
+      continue
+    }
+    try {
+      const source = await first.src_f.get()
+      groups[i].thumbnail = source.url
+    } catch {
+      // ignore thumbnail failures
+    }
+  }
+  return groups
 }
 
 function convertVideoFiles(videoFiles: TauriFile[]): OriginVideo[] {
@@ -125,12 +203,17 @@ const FsSystem: React.FC<FsSystemProps> = props => {
         prev[prefix] = item
         return prev
       }, {})
-      const eventsFiles = files.filter(({ path }) => /.+event.json$/.test(path))
+      const eventsFiles = files.filter(({ path }) => /.+event.json$/i.test(path))
       const dashcamFiles = files.filter(({ path }) => isDashcamMetaFile(path))
-      let events: EventJson[] = []
+      const eventByDir: Record<string, EventJson> = {}
       for (let i = 0; i < eventsFiles.length; i++) {
-        const eventJsonText = await readTextFile(eventsFiles[i].path)
-        events.push(JSON.parse(eventJsonText))
+        const file = eventsFiles[i]
+        try {
+          const eventJsonText = await readTextFile(file.path)
+          eventByDir[normalizeDirPath(getParentDir(file.path))] = JSON.parse(eventJsonText)
+        } catch {
+          // ignore malformed event files
+        }
       }
       for (let i = 0; i < dashcamFiles.length; i++) {
         const file = dashcamFiles[i]
@@ -148,19 +231,8 @@ const FsSystem: React.FC<FsSystemProps> = props => {
           current.dashcam = mergeDashcamPoints(current.dashcam, points)
         }
       }
-      events = events.sort((a, b) => dayjs(a.timestamp).valueOf() - dayjs(b.timestamp).valueOf())
-      const newVideos = videos.sort((a, b) => a.time - b.time)
-      newVideos.forEach((item, vIndex) => {
-        const eIndex = events.findIndex(({ timestamp }) => item.time > dayjs(timestamp).valueOf())
-        if (eIndex > -1) {
-          const event = events[eIndex]
-          events.splice(eIndex, 1)
-          if (newVideos[vIndex - 1]) {
-            newVideos[vIndex - 1].event = dayjs(event.timestamp).valueOf()
-          }
-        }
-      })
-      props.onAccess(newVideos)
+      const groups = await buildVideoGroups(videos, eventByDir)
+      props.onAccess(groups)
     })
   }
   return (

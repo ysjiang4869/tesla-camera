@@ -48,6 +48,21 @@ export interface OriginVideo {
   dashcam?: DashcamPoint[]
 }
 
+export interface OriginVideoGroup {
+  id: string
+  title: string
+  time: number
+  type: TypeEnum
+  dir: string
+  clips: OriginVideo[]
+  event?: number
+  city?: string
+  latitude?: number
+  longitude?: number
+  reason?: string
+  thumbnail?: string
+}
+
 export interface OriginFSVideo {
   title: string
   time: number
@@ -76,6 +91,21 @@ export interface Video {
   src_r_path: string
   src_l_path: string
   dashcam?: DashcamPoint[]
+}
+
+export interface VideoGroup {
+  id: string
+  title: string
+  time: number
+  type: TypeEnum
+  dir: string
+  videos: Video[]
+  event?: number
+  city?: string
+  latitude?: number
+  longitude?: number
+  reason?: string
+  thumbnail?: string
 }
 
 export interface DashcamPoint {
@@ -113,7 +143,8 @@ export type DashcamValue = string | number | boolean
 export interface ModelState {
   type: TypeEnum
   current?: Video
-  list: OriginVideo[]
+  currentGroup?: VideoGroup
+  list: OriginVideoGroup[]
   events: VideoFile[]
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   makeStyles,
   shorthands,
@@ -103,7 +103,8 @@ const useStyles = makeStyles({
 })
 
 interface PlayerProps {
-  video?: Video
+  videos?: Video[]
+  onVideoChange?: (video: Video) => void
 }
 
 function getSrc(camera: CameraEnum, video: Video): string {
@@ -128,16 +129,51 @@ function fmtTime(time: number) {
 const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   const styles = useStyles()
   const [currentCamera, setCurrentCamera] = useState(CameraEnum.前)
-  const [currentTime, setCurrentTime] = useState(CameraEnum.前)
+  const [currentClipIndex, setCurrentClipIndex] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
   const [paused, setPaused] = useState(true)
   const [duration, setDuration] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
   const inputIsFocus = useRef(false)
   const { delayPlay } = useDelayPlay()
-  const dashcamPoint = findDashcamPoint(props.video?.dashcam, currentTime)
+  const currentVideo = props.videos?.[currentClipIndex]
+  const dashcamPoint = findDashcamPoint(currentVideo?.dashcam, currentTime)
   const dashcamText = formatDashcamText(dashcamPoint)
   const showDashcamDebug = localStorage.getItem('dashcamDebug') === '1'
   const dashcamDebugText = showDashcamDebug ? formatDashcamDebugText(dashcamPoint) : ''
+  useEffect(() => {
+    setCurrentClipIndex(0)
+    setCurrentTime(0)
+    setDuration(0)
+    setPaused(true)
+    setCurrentCamera(CameraEnum.前)
+    if (!videoRef.current || !props.videos?.length) {
+      return
+    }
+    videoRef.current.pause()
+    videoRef.current.src = getSrc(CameraEnum.前, props.videos[0])
+    videoRef.current.currentTime = 0
+  }, [props.videos])
+
+  function switchToClip(nextIndex: number, autoplay: boolean) {
+    if (!videoRef.current || !props.videos?.[nextIndex]) {
+      return
+    }
+    const nextVideo = props.videos[nextIndex]
+    setCurrentClipIndex(nextIndex)
+    setCurrentTime(0)
+    setDuration(0)
+    videoRef.current.pause()
+    videoRef.current.src = getSrc(currentCamera, nextVideo)
+    videoRef.current.currentTime = 0
+    if (autoplay) {
+      delayPlay(videoRef.current)
+    } else {
+      setPaused(true)
+    }
+    props.onVideoChange?.(nextVideo)
+  }
+
   function onKeyUp(e: Parameters<React.KeyboardEventHandler>[0]) {
     e.preventDefault()
     switch (e.code) {
@@ -165,12 +201,12 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
     }
   }
   function onSelectCamera(val: CameraEnum) {
-    if (!videoRef.current || !props.video) return
+    if (!videoRef.current || !currentVideo) return
     setCurrentCamera(val)
     const prePaused = videoRef.current.paused
     const currentTime = videoRef.current.currentTime
     videoRef.current.pause()
-    videoRef.current.src = getSrc(val, props.video)
+    videoRef.current.src = getSrc(val, currentVideo)
     videoRef.current.currentTime = currentTime
     if (!prePaused) {
       delayPlay(videoRef.current)
@@ -178,7 +214,12 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   }
   function onTimeupdate() {
     if (!videoRef.current) return
-    if (videoRef.current.currentTime >= videoRef.current.duration) {
+    if (videoRef.current.currentTime >= videoRef.current.duration - 0.05) {
+      const nextIndex = currentClipIndex + 1
+      if (props.videos && nextIndex < props.videos.length) {
+        switchToClip(nextIndex, !videoRef.current.paused)
+        return
+      }
       setCurrentTime(0)
       videoRef.current.pause()
     } else {
@@ -218,7 +259,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   return (
     <div className={styles.root}>
       {
-        props.video ? (
+        currentVideo ? (
           <div className={styles.root}>
             <label className={styles.videoWrap} htmlFor="player-focus-input">
               <video
@@ -231,7 +272,7 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                 onPlay={() => setPaused(false)}
                 onTimeUpdate={onTimeupdate}
               >
-                <source src={getSrc(currentCamera, props.video)} type="video/mp4" />
+                <source src={getSrc(currentCamera, currentVideo)} type="video/mp4" />
               </video>
               {
                   [CameraEnum.前, CameraEnum.后, CameraEnum.左, CameraEnum.右].map(camera => (
@@ -241,13 +282,14 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                       isActive={currentCamera === camera}
                       key={camera}
                       paused={paused}
-                      src={getSrc(camera, props.video)}
+                      src={getSrc(camera, currentVideo)}
                       onClick={() => onSelectCamera(camera)}
                     />
                   ))
                 }
               <div className={styles.time}>
-                {dayjs(props.video.time + currentTime * 1000).format('YYYY年MM月DD日 HH:mm:ss')}
+                {dayjs(currentVideo.time + currentTime * 1000).format('YYYY年MM月DD日 HH:mm:ss')}
+                {props.videos && props.videos.length > 1 ? ` (${currentClipIndex + 1}/${props.videos.length})` : ''}
               </div>
               {dashcamText ? (
                 <div className={styles.dashcam}>

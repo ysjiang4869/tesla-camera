@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import cln from 'classnames'
+import dayjs from 'dayjs'
 import {
   makeStyles,
   shorthands,
@@ -21,7 +22,14 @@ import FfmpegTerminal from './components/ffmpeg-terminal'
 import FfmpegExport from './components/ffmpeg-export'
 import FsSystem from './components/fs-system'
 import CheckUpdate from './components/check-update'
-import { TypeEnum, type ModelState, type OriginVideo } from './model'
+import {
+  TypeEnum,
+  type ModelState,
+  type OriginVideo,
+  type OriginVideoGroup,
+  type Video,
+  type VideoGroup,
+} from './model'
 import { parseDashcamFromMp4 } from './dashcam'
 
 const useStyles = makeStyles({
@@ -60,12 +68,12 @@ const useStyles = makeStyles({
     textAlign: 'right',
   },
   menuItem: {
-    ...shorthands.padding('6px', '16px'),
+    ...shorthands.padding('8px'),
     ...shorthands.borderRadius('4px'),
     ...shorthands.transition('all', '120ms'),
     backgroundColor: tokens.colorNeutralBackground1,
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'stretch',
     cursor: 'pointer',
     columnGap: '12px',
     color: tokens.colorNeutralForeground1,
@@ -78,6 +86,42 @@ const useStyles = makeStyles({
     ':hover': {
       color: tokens.colorPaletteRedBorderActive,
     },
+  },
+  menuThumbWrap: {
+    width: '112px',
+    height: '72px',
+    flexShrink: 0,
+    backgroundColor: tokens.colorNeutralBackground3,
+    ...shorthands.borderRadius('4px'),
+    ...shorthands.overflow('hidden'),
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuThumb: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block',
+  },
+  menuInfo: {
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    rowGap: '2px',
+    flexGrow: 1,
+  },
+  menuTitle: {
+    fontWeight: 600,
+    lineHeight: '20px',
+  },
+  menuMeta: {
+    color: tokens.colorNeutralForeground3,
+    fontSize: '12px',
+    lineHeight: '16px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   content: {
     height: '100vh',
@@ -113,6 +157,25 @@ const useStyles = makeStyles({
     justifyContent: 'center',
   },
 })
+
+const TYPE_LABEL_MAP: Record<TypeEnum, string> = {
+  [TypeEnum.所有]: '所有',
+  [TypeEnum.事件]: '事件',
+  [TypeEnum.哨兵]: '哨兵',
+  [TypeEnum.行车记录仪]: '记录仪',
+}
+
+function revokeGroupUrls(group?: VideoGroup) {
+  if (!group) {
+    return
+  }
+  group.videos.forEach((item) => {
+    URL.revokeObjectURL(item.src_f)
+    URL.revokeObjectURL(item.src_b)
+    URL.revokeObjectURL(item.src_l)
+    URL.revokeObjectURL(item.src_r)
+  })
+}
 
 const tabs = [
   {
@@ -151,24 +214,19 @@ function App() {
       document.onkeydown = null
     }
   }, [])
-  function onFileSystemAccess(videos: OriginVideo[]) {
-    setState({
-      ...state,
-      list: videos,
-    })
+  useEffect(() => () => {
+    revokeGroupUrls(state.currentGroup)
+  }, [state.currentGroup])
+  function onFileSystemAccess(groups: OriginVideoGroup[]) {
+    setState(prev => ({
+      ...prev,
+      list: groups,
+      current: undefined,
+      currentGroup: undefined,
+    }))
   }
-  async function onSelectVideo(value: number) {
-    if (state.current) {
-      const {
-        src_f, src_b, src_l, src_r,
-      } = state.current
-      URL.revokeObjectURL(src_f)
-      URL.revokeObjectURL(src_b)
-      URL.revokeObjectURL(src_l)
-      URL.revokeObjectURL(src_r)
-    }
-    const origin = state.list.find(({ time }) => time === value)
-    if (!origin) return
+
+  async function loadVideo(origin: OriginVideo): Promise<Video> {
     const [
       src_f_file,
       src_b_file,
@@ -188,27 +246,59 @@ function App() {
       // ignore malformed telemetry payloads
       }
     }
-    setState({
-      ...state,
-      current: {
-        ...origin,
-        src_f: src_f_file.url,
-        src_f_name: src_f_file.name,
-        src_f_path: origin.src_f.path,
-        src_b: src_b_file.url,
-        src_b_name: src_b_file.name,
-        src_b_path: origin.src_b.path,
-        src_l: src_l_file.url,
-        src_l_name: src_l_file.name,
-        src_l_path: origin.src_l.path,
-        src_r: src_r_file.url,
-        src_r_name: src_r_file.name,
-        src_r_path: origin.src_r.path,
-        dashcam: origin.dashcam,
-      },
-    })
+    return {
+      ...origin,
+      src_f: src_f_file.url,
+      src_f_name: src_f_file.name,
+      src_f_path: origin.src_f.path,
+      src_b: src_b_file.url,
+      src_b_name: src_b_file.name,
+      src_b_path: origin.src_b.path,
+      src_l: src_l_file.url,
+      src_l_name: src_l_file.name,
+      src_l_path: origin.src_l.path,
+      src_r: src_r_file.url,
+      src_r_name: src_r_file.name,
+      src_r_path: origin.src_r.path,
+      dashcam: origin.dashcam,
+    }
   }
-  const videoList = state.list
+
+  async function onSelectGroup(groupId: string) {
+    const originGroup = state.list.find(item => item.id === groupId)
+    if (!originGroup) {
+      return
+    }
+    revokeGroupUrls(state.currentGroup)
+    const videos = await Promise.all(originGroup.clips.map(item => loadVideo(item)))
+    const currentGroup: VideoGroup = {
+      id: originGroup.id,
+      title: originGroup.title,
+      time: originGroup.time,
+      type: originGroup.type,
+      dir: originGroup.dir,
+      videos,
+      event: originGroup.event,
+      city: originGroup.city,
+      latitude: originGroup.latitude,
+      longitude: originGroup.longitude,
+      reason: originGroup.reason,
+      thumbnail: originGroup.thumbnail,
+    }
+    setState(prev => ({
+      ...prev,
+      currentGroup,
+      current: videos[0],
+    }))
+  }
+
+  function onCurrentVideoChange(video: Video) {
+    setState(prev => ({
+      ...prev,
+      current: video,
+    }))
+  }
+  const groupList = state.list
     .filter(({ type }) => type === filterType || filterType === TypeEnum.所有)
     .sort((a, b) => b.time - a.time)
   return (
@@ -232,11 +322,11 @@ function App() {
           </div>
           <div className={styles.menuWrap}>
             {
-              videoList.map((item) => (
+              groupList.map((item) => (
                 <div
-                  className={cln(styles.menuItem, { [styles.menuItemIsActive]: item.time === state.current?.time })}
-                  key={item.time}
-                  onClick={() => onSelectVideo(item.time)}
+                  className={cln(styles.menuItem, { [styles.menuItemIsActive]: item.id === state.currentGroup?.id })}
+                  key={item.id}
+                  onClick={() => onSelectGroup(item.id)}
                   onKeyDown={(e) => {
                     e.preventDefault()
                   }}
@@ -244,15 +334,27 @@ function App() {
                     e.preventDefault()
                   }}
                 >
-                  <Record24Regular />
-                  {item.title}
+                  <div className={styles.menuThumbWrap}>
+                    {item.thumbnail ? <video autoPlay loop muted playsInline className={styles.menuThumb} preload="metadata" src={item.thumbnail} /> : <Record24Regular />}
+                  </div>
+                  <div className={styles.menuInfo}>
+                    <div className={styles.menuTitle}>{item.title}</div>
+                    <div className={styles.menuMeta}>{TYPE_LABEL_MAP[item.type]} | {item.city ?? '未知位置'}</div>
+                    <div className={styles.menuMeta}>
+                      事件时间: {item.event ? dayjs(item.event).format('YYYY-MM-DD HH:mm:ss') : '-'}
+                    </div>
+                    <div className={styles.menuMeta}>
+                      片段数: {item.clips.length}
+                      {item.latitude !== undefined && item.longitude !== undefined ? ` | ${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)}` : ''}
+                    </div>
+                  </div>
                   <div className={styles.eventTag}>
                     {item.event ? <Badge color="danger" size="extra-small" /> : null}
                   </div>
                 </div>
               ))
             }
-            {!videoList.length && <div className={styles.empty}>暂无数据</div>}
+            {!groupList.length && <div className={styles.empty}>暂无数据</div>}
           </div>
         </div>
         <div className={styles.content}>
@@ -301,7 +403,7 @@ function App() {
             </div>
           </div>
           <div className={styles.player}>
-            <Player key={state.current?.time} video={state.current} />
+            <Player key={state.currentGroup?.id} videos={state.currentGroup?.videos} onVideoChange={onCurrentVideoChange} />
           </div>
         </div>
       </div>
