@@ -1,4 +1,6 @@
 const thumbnailCache = new Map<string, Promise<string | undefined>>()
+const PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="224" height="126" viewBox="0 0 224 126"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#d6d8dc"/><stop offset="100%" stop-color="#b9bcc2"/></linearGradient></defs><rect width="224" height="126" fill="url(#g)"/><g fill="#8a8f98"><rect x="88" y="46" width="48" height="34" rx="4"/><polygon points="106,55 122,63 106,71"/></g></svg>`
+export const DEFAULT_THUMBNAIL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(PLACEHOLDER_SVG)}`
 
 function toBlob(canvas: HTMLCanvasElement, quality = 0.72): Promise<Blob | undefined> {
   return new Promise((resolve) => {

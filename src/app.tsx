@@ -218,12 +218,40 @@ function App() {
     revokeGroupUrls(state.currentGroup)
   }, [state.currentGroup])
   function onFileSystemAccess(groups: OriginVideoGroup[]) {
-    setState(prev => ({
-      ...prev,
-      list: groups,
-      current: undefined,
-      currentGroup: undefined,
-    }))
+    setState((prev) => {
+      const currentGroupId = prev.currentGroup?.id
+      const nextMeta = currentGroupId ? groups.find(item => item.id === currentGroupId) : undefined
+      if (!nextMeta || !prev.currentGroup) {
+        return {
+          ...prev,
+          list: groups,
+          current: undefined,
+          currentGroup: undefined,
+        }
+      }
+      const nextCurrentGroup: VideoGroup = {
+        ...prev.currentGroup,
+        title: nextMeta.title,
+        time: nextMeta.time,
+        type: nextMeta.type,
+        dir: nextMeta.dir,
+        event: nextMeta.event,
+        city: nextMeta.city,
+        latitude: nextMeta.latitude,
+        longitude: nextMeta.longitude,
+        reason: nextMeta.reason,
+        thumbnail: nextMeta.thumbnail,
+      }
+      const nextCurrent = prev.current
+        ? nextCurrentGroup.videos.find(video => video.time === prev.current?.time) ?? prev.current
+        : nextCurrentGroup.videos[0]
+      return {
+        ...prev,
+        list: groups,
+        currentGroup: nextCurrentGroup,
+        current: nextCurrent,
+      }
+    })
   }
 
   async function loadVideo(origin: OriginVideo): Promise<Video> {

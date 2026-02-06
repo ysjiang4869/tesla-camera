@@ -12,7 +12,7 @@ import {
 import {
   getClipPrefix, isDashcamMetaFile, mergeDashcamPoints, parseDashcamTelemetry,
 } from '../dashcam'
-import { getCachedVideoThumbnail } from '../thumbnail'
+import { DEFAULT_THUMBNAIL, getCachedVideoThumbnail } from '../thumbnail'
 
 interface DirectoryAccessProps {
   onAccess: (accessFile: OriginVideoGroup[]) => void
@@ -82,7 +82,7 @@ function toNumber(value?: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
-async function buildVideoGroups(videos: OriginVideo[], eventByDir: Record<string, EventJson>): Promise<OriginVideoGroup[]> {
+function buildVideoGroups(videos: OriginVideo[], eventByDir: Record<string, EventJson>): OriginVideoGroup[] {
   const map: Record<string, OriginVideoGroup> = {}
   videos.forEach((item) => {
     const key = normalizeDirPath(item.dir)
@@ -94,6 +94,7 @@ async function buildVideoGroups(videos: OriginVideo[], eventByDir: Record<string
         type: item.type,
         dir: item.dir,
         clips: [],
+        thumbnail: DEFAULT_THUMBNAIL,
       }
     }
     const group = map[key]
@@ -116,18 +117,36 @@ async function buildVideoGroups(videos: OriginVideo[], eventByDir: Record<string
       return item
     })
     .sort((a, b) => b.time - a.time)
+  return groups
+}
+
+async function hydrateGroupThumbnails(
+  groups: OriginVideoGroup[],
+  isCanceled: () => boolean,
+  onChange: (next: OriginVideoGroup[]) => void,
+) {
+  let changed = false
   for (let i = 0; i < groups.length; i++) {
+    if (isCanceled()) {
+      return
+    }
     const first = groups[i].clips[0]
     if (!first) {
       continue
     }
-    try {
-      groups[i].thumbnail = await getCachedVideoThumbnail(first.src_f.path, async () => (await first.src_f.get()).url)
-    } catch {
-      // ignore thumbnail failures
+    const thumbnail = await getCachedVideoThumbnail(first.src_f.path, async () => (await first.src_f.get()).url)
+    if (isCanceled()) {
+      return
+    }
+    if (thumbnail && thumbnail !== groups[i].thumbnail) {
+      groups[i].thumbnail = thumbnail
+      changed = true
+      onChange([...groups])
     }
   }
-  return groups
+  if (changed && !isCanceled()) {
+    onChange([...groups])
+  }
 }
 
 function convertFiles(videoFiles: VideoFile[]): OriginVideo[] {
@@ -179,7 +198,11 @@ function convertFiles(videoFiles: VideoFile[]): OriginVideo[] {
 }
 
 const DirectoryAccess: React.FC<React.PropsWithChildren<DirectoryAccessProps>> = props => {
+  const loadTokenRef = React.useRef(0)
+
   async function onSelectFile() {
+    const loadToken = loadTokenRef.current + 1
+    loadTokenRef.current = loadToken
     const dirHandle = await window.showDirectoryPicker()
     const files = await getDirFiles(dirHandle)
     const videos = convertFiles(files)
@@ -216,8 +239,13 @@ const DirectoryAccess: React.FC<React.PropsWithChildren<DirectoryAccessProps>> =
         current.dashcam = mergeDashcamPoints(current.dashcam, points)
       }
     }
-    const groups = await buildVideoGroups(videos, eventByDir)
+    const groups = buildVideoGroups(videos, eventByDir)
     props.onAccess(groups)
+    void hydrateGroupThumbnails(
+      groups,
+      () => loadTokenRef.current !== loadToken,
+      (next) => props.onAccess(next),
+    )
   }
   return (
     <Tooltip content={<>选择车载U盘中的<Body1Strong>TeslaCam</Body1Strong>目录，或者是<Body1Strong>TeslaCam</Body1Strong>文件目录的拷贝</>} relationship="label">
