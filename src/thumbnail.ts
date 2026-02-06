@@ -17,6 +17,10 @@ async function captureFirstFrame(videoUrl: string): Promise<string | undefined> 
   video.src = videoUrl
 
   await new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      cleanup()
+      reject(new Error('load video frame timeout'))
+    }, 3500)
     const onLoadedData = () => {
       cleanup()
       resolve()
@@ -26,10 +30,13 @@ async function captureFirstFrame(videoUrl: string): Promise<string | undefined> 
       reject(new Error('failed to load video frame'))
     }
     const cleanup = () => {
+      window.clearTimeout(timeout)
       video.removeEventListener('loadeddata', onLoadedData)
+      video.removeEventListener('canplay', onLoadedData)
       video.removeEventListener('error', onError)
     }
     video.addEventListener('loadeddata', onLoadedData)
+    video.addEventListener('canplay', onLoadedData)
     video.addEventListener('error', onError)
     video.load()
   })
@@ -72,5 +79,10 @@ export async function getCachedVideoThumbnail(cacheKey: string, getVideoUrl: () 
     }
   })()
   thumbnailCache.set(cacheKey, task)
+  void task.then((result) => {
+    if (!result && thumbnailCache.get(cacheKey) === task) {
+      thumbnailCache.delete(cacheKey)
+    }
+  })
   return task
 }

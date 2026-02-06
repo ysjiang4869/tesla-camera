@@ -18,6 +18,8 @@ import {
 } from '../dashcam'
 import { DEFAULT_THUMBNAIL, getCachedVideoThumbnail } from '../thumbnail'
 
+const THUMBNAIL_CONCURRENCY = 4
+
 interface FsSystemProps {
   onAccess: (accessFile: OriginVideoGroup[]) => void
 }
@@ -132,28 +134,64 @@ async function hydrateGroupThumbnails(
   isCanceled: () => boolean,
   onChange: (next: OriginVideoGroup[]) => void,
 ) {
-  let changed = false
-  for (let i = 0; i < groups.length; i++) {
-    if (isCanceled()) {
-      return
-    }
-    const first = groups[i].clips[0]
-    if (!first) {
-      continue
-    }
-    const thumbnail = await getCachedVideoThumbnail(first.src_f.path, async () => (await first.src_f.get()).url)
-    if (isCanceled()) {
-      return
-    }
-    if (thumbnail && thumbnail !== groups[i].thumbnail) {
-      groups[i].thumbnail = thumbnail
-      changed = true
-      onChange([...groups])
-    }
+  if (!groups.length) {
+    return
   }
-  if (changed && !isCanceled()) {
+  let cursor = 0
+  let changed = false
+  let changedCount = 0
+  const flush = () => {
+    if (!changed || isCanceled()) {
+      return
+    }
+    changed = false
     onChange([...groups])
   }
+
+  async function worker() {
+    while (!isCanceled()) {
+      const index = cursor
+      cursor += 1
+      if (index >= groups.length) {
+        return
+      }
+      const group = groups[index]
+      const candidates = group.clips.filter(item => item.src_f).slice(0, 3)
+      if (!candidates.length) {
+        continue
+      }
+      let thumbnail: string | undefined
+      for (let i = 0; i < candidates.length; i++) {
+        if (isCanceled()) {
+          return
+        }
+        const clip = candidates[i]
+        try {
+          thumbnail = await getCachedVideoThumbnail(clip.src_f.path, async () => (await clip.src_f.get()).url)
+        } catch {
+          thumbnail = undefined
+        }
+        if (thumbnail) {
+          break
+        }
+      }
+      if (isCanceled()) {
+        return
+      }
+      if (thumbnail && thumbnail !== group.thumbnail) {
+        group.thumbnail = thumbnail
+        changed = true
+        changedCount += 1
+        if (changedCount % 8 === 0) {
+          flush()
+        }
+      }
+    }
+  }
+
+  const workerCount = Math.min(THUMBNAIL_CONCURRENCY, groups.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  flush()
 }
 
 function convertVideoFiles(videoFiles: TauriFile[]): OriginVideo[] {
