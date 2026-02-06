@@ -23,6 +23,7 @@ const HUD_MAX_WIDTH = '520px'
 const HUD_BOTTOM = '56px'
 const HUD_SIGNAL_INSET_PX = 8
 const HUD_PEDAL_INSET_PX = 18
+const STEERING_WHEEL_ICON = new URL('../assets/steering_wheel.png', import.meta.url).href
 
 const useStyles = makeStyles({
   root: {
@@ -114,22 +115,16 @@ const useStyles = makeStyles({
     textAlign: 'center',
   },
   steeringWheel: {
-    position: 'relative',
     width: '34px',
     height: '34px',
-    borderRadius: '50%',
-    border: '2px solid rgba(255, 255, 255, 0.95)',
     margin: '0 auto',
   },
-  steeringNeedle: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: '2px',
-    height: '13px',
-    borderRadius: '2px',
-    backgroundColor: tokens.colorNeutralBackground1,
-    transformOrigin: 'center 82%',
+  steeringImage: {
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    transformOrigin: '50% 50%',
   },
   steeringText: {
     marginTop: '2px',
@@ -1106,9 +1101,11 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                     <div className={styles.apStateText}>{formatAutopilot(dashcamPoint.autopilotState)}</div>
                     <div className={styles.steeringWrap}>
                       <div className={styles.steeringWheel}>
-                        <div
-                          className={styles.steeringNeedle}
-                          style={{ transform: `translate(-50%, -50%) rotate(${steeringRotate}deg)` }}
+                        <img
+                          alt="steering wheel"
+                          className={styles.steeringImage}
+                          src={STEERING_WHEEL_ICON}
+                          style={{ transform: `rotate(${steeringRotate}deg)` }}
                         />
                       </div>
                       <div className={styles.steeringText}>{steeringText}</div>
