@@ -17,12 +17,60 @@ import { type Video, type DashcamPoint, CameraEnum } from '../model'
 const PLAYBACK_RATE_CYCLE = [1, 1.5, 2, 0.5]
 const DURATION_LOAD_CONCURRENCY = 4
 const EVENT_MARKER_VISUAL_HALF_WIDTH = 5
+
+// HUD 容器：整体位置与尺寸
 const HUD_WIDTH = '35%'
 const HUD_MIN_WIDTH = '320px'
 const HUD_MAX_WIDTH = '520px'
+const HUD_MIN_HEIGHT = '168px'
 const HUD_BOTTOM = '56px'
+const HUD_PADDING_Y = 8
+const HUD_PADDING_X = 12
+const HUD_RADIUS = 8
+
+// HUD 上排：档位 / 辅助驾驶 / 方向盘
+const HUD_TOP_GEAR_SLOT_WIDTH = 58
+const HUD_TOP_STEERING_SLOT_WIDTH = 82
+const HUD_TOP_GAP = 8
+const HUD_GEAR_CIRCLE_SIZE = 44
+const HUD_GEAR_FONT_SIZE = 24
+const HUD_AP_FONT_SIZE = 14
+const HUD_STEERING_ICON_SIZE = 34
+const HUD_STEERING_TEXT_SIZE = 11
+const HUD_STEERING_TEXT_MARGIN_TOP = 2
+
+// HUD 中排：转向灯 / 速度
+const HUD_MIDDLE_SIDE_SLOT_WIDTH = 64
+const HUD_MIDDLE_MARGIN_TOP = 4
+const HUD_ARROW_FONT_SIZE = 42
+const HUD_ARROW_LINE_HEIGHT = 42
 const HUD_SIGNAL_INSET_PX = 8
+const HUD_SPEED_FONT_SIZE = 58
+const HUD_SPEED_LINE_HEIGHT = 54
+const HUD_SPEED_UNIT_FONT_SIZE = 13
+const HUD_SPEED_UNIT_LINE_HEIGHT = 14
+const HUD_SPEED_UNIT_MARGIN_TOP = 0
+
+// HUD 下排：刹车 / 元数据 / 电门
+const HUD_BOTTOM_PEDAL_WIDTH = 54
+const HUD_BOTTOM_GAP = 10
+const HUD_BOTTOM_MARGIN_TOP = 4
 const HUD_PEDAL_INSET_PX = 18
+const HUD_PEDAL_HEIGHT = 62
+const HUD_PEDAL_PADDING_Y = 6
+const HUD_PEDAL_PADDING_X = 4
+const HUD_PEDAL_RADIUS = 6
+const HUD_PEDAL_IDLE_BG = 'rgba(0, 0, 0, 0.42)'
+const HUD_PEDAL_LABEL_FONT_SIZE = 12
+const HUD_PEDAL_LABEL_LINE_HEIGHT = 16
+const HUD_PEDAL_VALUE_MARGIN_TOP = 2
+const HUD_PEDAL_VALUE_FONT_SIZE = 14
+const HUD_PEDAL_VALUE_LINE_HEIGHT = 16
+const HUD_META_FONT_SIZE = 11
+const HUD_META_LINE_HEIGHT = 14
+const HUD_DEBUG_MARGIN_TOP = 2
+const HUD_DEBUG_FONT_SIZE = 12
+
 const STEERING_WHEEL_ICON = new URL('../assets/steering_wheel.png', import.meta.url).href
 
 const useStyles = makeStyles({
@@ -69,26 +117,27 @@ const useStyles = makeStyles({
     width: HUD_WIDTH,
     minWidth: HUD_MIN_WIDTH,
     maxWidth: HUD_MAX_WIDTH,
+    minHeight: HUD_MIN_HEIGHT,
     color: tokens.colorNeutralBackground1Hover,
-    ...shorthands.padding('8px', '12px'),
+    ...shorthands.padding(`${HUD_PADDING_Y}px`, `${HUD_PADDING_X}px`),
     backgroundColor: tokens.colorNeutralStencil1Alpha,
-    ...shorthands.borderRadius('8px'),
+    ...shorthands.borderRadius(`${HUD_RADIUS}px`),
     border: '1px solid rgba(255, 255, 255, 0.2)',
     zIndex: 3,
     pointerEvents: 'none',
   },
   dashTopRow: {
     display: 'grid',
-    gridTemplateColumns: '58px 1fr 82px',
+    gridTemplateColumns: `${HUD_TOP_GEAR_SLOT_WIDTH}px 1fr ${HUD_TOP_STEERING_SLOT_WIDTH}px`,
     alignItems: 'center',
-    columnGap: '8px',
+    columnGap: `${HUD_TOP_GAP}px`,
   },
   gearWrap: {
     justifySelf: 'start',
   },
   gearCircle: {
-    width: '44px',
-    height: '44px',
+    width: `${HUD_GEAR_CIRCLE_SIZE}px`,
+    height: `${HUD_GEAR_CIRCLE_SIZE}px`,
     borderRadius: '50%',
     border: '2px solid rgba(255, 255, 255, 0.8)',
     backgroundColor: 'transparent',
@@ -97,14 +146,14 @@ const useStyles = makeStyles({
     justifyContent: 'center',
   },
   gearLetter: {
-    fontSize: '24px',
-    lineHeight: '24px',
+    fontSize: `${HUD_GEAR_FONT_SIZE}px`,
+    lineHeight: `${HUD_GEAR_FONT_SIZE}px`,
     fontWeight: 800,
     fontVariantNumeric: 'tabular-nums',
   },
   apStateText: {
     textAlign: 'center',
-    fontSize: '14px',
+    fontSize: `${HUD_AP_FONT_SIZE}px`,
     fontWeight: 600,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -115,8 +164,8 @@ const useStyles = makeStyles({
     textAlign: 'center',
   },
   steeringWheel: {
-    width: '34px',
-    height: '34px',
+    width: `${HUD_STEERING_ICON_SIZE}px`,
+    height: `${HUD_STEERING_ICON_SIZE}px`,
     margin: '0 auto',
   },
   steeringImage: {
@@ -127,20 +176,20 @@ const useStyles = makeStyles({
     transformOrigin: '50% 50%',
   },
   steeringText: {
-    marginTop: '2px',
-    fontSize: '11px',
+    marginTop: `${HUD_STEERING_TEXT_MARGIN_TOP}px`,
+    fontSize: `${HUD_STEERING_TEXT_SIZE}px`,
     fontVariantNumeric: 'tabular-nums',
   },
   dashMiddleRow: {
     display: 'grid',
-    gridTemplateColumns: '64px 1fr 64px',
+    gridTemplateColumns: `${HUD_MIDDLE_SIDE_SLOT_WIDTH}px 1fr ${HUD_MIDDLE_SIDE_SLOT_WIDTH}px`,
     alignItems: 'center',
-    marginTop: '4px',
+    marginTop: `${HUD_MIDDLE_MARGIN_TOP}px`,
   },
   turnArrow: {
     textAlign: 'center',
-    fontSize: '42px',
-    lineHeight: '42px',
+    fontSize: `${HUD_ARROW_FONT_SIZE}px`,
+    lineHeight: `${HUD_ARROW_LINE_HEIGHT}px`,
     fontWeight: 700,
     opacity: 0.25,
     transitionDuration: '120ms',
@@ -159,33 +208,33 @@ const useStyles = makeStyles({
     textAlign: 'center',
   },
   speedValue: {
-    fontSize: '58px',
-    lineHeight: '54px',
+    fontSize: `${HUD_SPEED_FONT_SIZE}px`,
+    lineHeight: `${HUD_SPEED_LINE_HEIGHT}px`,
     fontWeight: 800,
     fontVariantNumeric: 'tabular-nums',
   },
   speedUnit: {
-    marginTop: '0',
-    fontSize: '13px',
-    lineHeight: '14px',
+    marginTop: `${HUD_SPEED_UNIT_MARGIN_TOP}px`,
+    fontSize: `${HUD_SPEED_UNIT_FONT_SIZE}px`,
+    lineHeight: `${HUD_SPEED_UNIT_LINE_HEIGHT}px`,
     letterSpacing: '1px',
     opacity: 0.95,
   },
   dashBottomRow: {
     display: 'grid',
-    gridTemplateColumns: '54px 1fr 54px',
+    gridTemplateColumns: `${HUD_BOTTOM_PEDAL_WIDTH}px 1fr ${HUD_BOTTOM_PEDAL_WIDTH}px`,
     alignItems: 'end',
-    columnGap: '10px',
-    marginTop: '4px',
+    columnGap: `${HUD_BOTTOM_GAP}px`,
+    marginTop: `${HUD_BOTTOM_MARGIN_TOP}px`,
   },
   pedalBox: {
     position: 'relative',
-    height: '62px',
-    ...shorthands.padding('6px', '4px'),
-    ...shorthands.borderRadius('6px'),
+    height: `${HUD_PEDAL_HEIGHT}px`,
+    ...shorthands.padding(`${HUD_PEDAL_PADDING_Y}px`, `${HUD_PEDAL_PADDING_X}px`),
+    ...shorthands.borderRadius(`${HUD_PEDAL_RADIUS}px`),
     border: '1px solid rgba(255, 255, 255, 0.4)',
     textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    backgroundColor: HUD_PEDAL_IDLE_BG,
     ...shorthands.overflow('hidden'),
     display: 'flex',
     flexDirection: 'column',
@@ -219,21 +268,21 @@ const useStyles = makeStyles({
     zIndex: 2,
   },
   pedalLabel: {
-    fontSize: '12px',
-    lineHeight: '16px',
+    fontSize: `${HUD_PEDAL_LABEL_FONT_SIZE}px`,
+    lineHeight: `${HUD_PEDAL_LABEL_LINE_HEIGHT}px`,
     fontWeight: 600,
   },
   pedalValue: {
-    marginTop: '2px',
-    fontSize: '14px',
-    lineHeight: '16px',
+    marginTop: `${HUD_PEDAL_VALUE_MARGIN_TOP}px`,
+    fontSize: `${HUD_PEDAL_VALUE_FONT_SIZE}px`,
+    lineHeight: `${HUD_PEDAL_VALUE_LINE_HEIGHT}px`,
     fontWeight: 700,
     fontVariantNumeric: 'tabular-nums',
   },
   dashMeta: {
     textAlign: 'center',
-    fontSize: '11px',
-    lineHeight: '14px',
+    fontSize: `${HUD_META_FONT_SIZE}px`,
+    lineHeight: `${HUD_META_LINE_HEIGHT}px`,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -241,8 +290,8 @@ const useStyles = makeStyles({
     opacity: 0.95,
   },
   dashcamDebug: {
-    marginTop: '2px',
-    fontSize: '12px',
+    marginTop: `${HUD_DEBUG_MARGIN_TOP}px`,
+    fontSize: `${HUD_DEBUG_FONT_SIZE}px`,
     opacity: 0.95,
     whiteSpace: 'normal',
     wordBreak: 'break-all',
