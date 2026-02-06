@@ -83,6 +83,10 @@ const useStyles = makeStyles({
     flexWrap: 'wrap',
   },
   slider: {
+    width: '100%',
+  },
+  sliderWrap: {
+    position: 'relative',
     flexGrow: 1,
     minWidth: '320px',
   },
@@ -108,6 +112,26 @@ const useStyles = makeStyles({
   seekButton: {
     minWidth: '58px',
   },
+  eventMarker: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '2px',
+    height: '18px',
+    pointerEvents: 'none',
+    backgroundColor: tokens.colorPaletteRedForeground1,
+    zIndex: 2,
+    '&::before': {
+      content: '" "',
+      position: 'absolute',
+      width: '8px',
+      height: '8px',
+      top: '-5px',
+      left: '-3px',
+      borderRadius: '50%',
+      backgroundColor: tokens.colorPaletteRedForeground1,
+    },
+  },
   empty: {},
   playFocusInput: {
     opacity: 0,
@@ -119,6 +143,7 @@ const useStyles = makeStyles({
 
 interface PlayerProps {
   videos?: Video[]
+  eventTime?: number
   onVideoChange?: (video: Video) => void
 }
 
@@ -266,6 +291,41 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
   )
   const currentClipDuration = normalizeDuration(clipDurations[currentClipIndex])
   const sliderMax = totalDuration > 0 ? totalDuration : 0.1
+  const eventTimelineTime = useMemo(() => {
+    if (!props.eventTime || !props.videos?.length || !clipDurations.length) {
+      return undefined
+    }
+    const eventMs = props.eventTime
+    const videos = props.videos
+    let clipIndex = videos.length - 1
+    if (eventMs <= videos[0].time) {
+      clipIndex = 0
+    } else {
+      for (let i = 0; i < videos.length - 1; i++) {
+        if (eventMs < videos[i + 1].time) {
+          clipIndex = i
+          break
+        }
+      }
+    }
+    const clipDuration = normalizeDuration(clipDurations[clipIndex])
+    const clipStart = clipStarts[clipIndex] ?? 0
+    const offsetSeconds = Math.max(
+      0,
+      Math.min(
+        (eventMs - videos[clipIndex].time) / 1000,
+        Math.max(clipDuration - 0.01, 0),
+      ),
+    )
+    return Math.min(Math.max(clipStart + offsetSeconds, 0), sliderMax)
+  }, [clipDurations, clipStarts, props.eventTime, props.videos, sliderMax])
+  const eventMarkerLeft = useMemo(() => {
+    if (eventTimelineTime === undefined || totalDuration <= 0) {
+      return undefined
+    }
+    const percent = (eventTimelineTime / totalDuration) * 100
+    return `${Math.max(0, Math.min(percent, 100))}%`
+  }, [eventTimelineTime, totalDuration])
 
   useEffect(() => {
     setCurrentClipIndex(0)
@@ -502,7 +562,6 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
               }
               <div className={styles.time}>
                 {dayjs(currentVideo.time + currentTime * 1000).format('YYYY-MM-DD HH:mm:ss')}
-                {props.videos && props.videos.length > 1 ? ` (${currentClipIndex + 1}/${props.videos.length})` : ''}
               </div>
               {dashcamText ? (
                 <div className={styles.dashcam}>
@@ -536,13 +595,16 @@ const Player: React.FC<React.PropsWithChildren<PlayerProps>> = (props) => {
                 </Button>
               </div>
               <div className={styles.sliderTime}>{fmtTime(currentTimelineTime)}</div>
-              <Slider
-                className={styles.slider}
-                max={sliderMax}
-                min={0}
-                value={Math.min(currentTimelineTime, sliderMax)}
-                onChange={(_, data) => seekTimeline(Number(data.value))}
-              />
+              <div className={styles.sliderWrap}>
+                <Slider
+                  className={styles.slider}
+                  max={sliderMax}
+                  min={0}
+                  value={Math.min(currentTimelineTime, sliderMax)}
+                  onChange={(_, data) => seekTimeline(Number(data.value))}
+                />
+                {eventMarkerLeft ? <div className={styles.eventMarker} style={{ left: eventMarkerLeft }} /> : null}
+              </div>
               <div className={styles.sliderTime}>{fmtTime(totalDuration || currentClipDuration)}</div>
             </div>
             <input

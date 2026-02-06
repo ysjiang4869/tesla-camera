@@ -413,7 +413,12 @@ function App() {
             </div>
           </div>
           <div className={styles.player}>
-            <Player key={state.currentGroup?.id} videos={state.currentGroup?.videos} onVideoChange={onCurrentVideoChange} />
+            <Player
+              eventTime={state.currentGroup?.event}
+              key={state.currentGroup?.id}
+              videos={state.currentGroup?.videos}
+              onVideoChange={onCurrentVideoChange}
+            />
           </div>
         </div>
       </div>
