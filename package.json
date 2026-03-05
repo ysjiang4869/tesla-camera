@@ -9,6 +9,8 @@
     "preview": "rsbuild preview --port 3091",
     "app:dev": "pnpm tauri dev",
     "app:build": "tauri build",
+    "app:build:multi": "bash ./scripts/build-multi-platform.sh",
+    "app:build:all": "bash ./scripts/build-multi-platform.sh --target all",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "bump:version": "node ./scripts/bump-version.js",
     "prepare": "husky install"

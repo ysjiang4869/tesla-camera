@@ -1,0 +1,111 @@
+name: Multi-platform Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Build target set"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - macos-intel
+          - macos-arm64
+          - windows-x64
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build (${{ matrix.settings.id }})
+    runs-on: ${{ matrix.settings.runner }}
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.settings.id
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - id: macos-intel
+            runner: macos-13
+            rust_target: x86_64-apple-darwin
+          - id: macos-arm64
+            runner: macos-14
+            rust_target: aarch64-apple-darwin
+          - id: windows-x64
+            runner: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          cache: "pnpm"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.settings.rust_target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download ffmpeg sidecar package
+        uses: robinraju/release-downloader@v1.11
+        with:
+          repository: Mario34/tesla-camera
+          tag: v1.0.0-pre
+          fileName: ffmpeg.zip
+          extract: true
+          out-file-path: release-downloader
+
+      - name: Init ffmpeg sidecar binaries
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p src-tauri/binaries
+          if [[ -f "$GITHUB_WORKSPACE/release-downloader/ffmpeg" ]]; then
+            chmod +x "$GITHUB_WORKSPACE/release-downloader/ffmpeg"
+            cp -f "$GITHUB_WORKSPACE/release-downloader/ffmpeg" src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+            cp -f "$GITHUB_WORKSPACE/release-downloader/ffmpeg" src-tauri/binaries/ffmpeg-x86_64-apple-darwin
+          fi
+          if [[ -f "$GITHUB_WORKSPACE/release-downloader/ffmpeg.exe" ]]; then
+            cp -f "$GITHUB_WORKSPACE/release-downloader/ffmpeg.exe" src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
+          fi
+          ls -la src-tauri/binaries
+
+      - name: Build app bundles
+        shell: bash
+        run: |
+          set -euxo pipefail
+          bash ./scripts/build-multi-platform.sh \
+            --target "${{ matrix.settings.id }}" \
+            --skip-install \
+            --skip-init-binaries \
+            --ci
+
+      - name: Upload bundle artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.settings.id }}
+          path: src-tauri/target/${{ matrix.settings.rust_target }}/release/bundle/**
+          if-no-files-found: error
+          retention-days: 14
