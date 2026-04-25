@@ -1,64 +1,17 @@
 import React, { useRef, useEffect } from 'react'
-import { makeStyles, tokens, shorthands } from '@fluentui/react-components'
-import cls from 'classnames'
-import { CameraEnum } from '../model'
 
 interface MiniPlayProps {
   currentTime: number
   src: string
-  camera: number
-  isActive: boolean
   paused: boolean
   playbackRate: number
   onClick: () => void
 }
 
-const useStyles = makeStyles({
-  root: {
-    position: 'absolute',
-    height: '120px',
-    width: '160px',
-    cursor: 'pointer',
-    backgroundColor: tokens.colorSubtleBackgroundInvertedHover,
-    ...shorthands.borderRadius('6px'),
-    ...shorthands.overflow('hidden'),
-    '&.c0': {
-      top: '30px',
-      left: '30px',
-    },
-    '&.c1': {
-      top: '30px',
-      right: '30px',
-    },
-    '&.c2': {
-      bottom: '30px',
-      left: '30px',
-    },
-    '&.c3': {
-      bottom: '30px',
-      right: '30px',
-    },
-  },
-  video: {
-    height: '100%',
-    width: '100%',
-    '&.is-hidden': {
-      opacity: 0,
-    },
-  },
-  name: {
-    position: 'absolute',
-    bottom: '6px',
-    left: '6px',
-    color: tokens.colorNeutralBackground1Hover,
-    fontWeight: '500',
-  },
-})
-
 const MiniPlay: React.FC<MiniPlayProps> = (props) => {
-  const styles = useStyles()
   const videoRef = useRef<HTMLVideoElement>(null)
   const playTimerRef = useRef<number | null>(null)
+
   useEffect(() => {
     if (!videoRef.current) return
     if (props.paused && !videoRef.current.paused) {
@@ -70,46 +23,34 @@ const MiniPlay: React.FC<MiniPlayProps> = (props) => {
       if (playTimerRef.current) {
         clearTimeout(playTimerRef.current)
       }
-      playTimerRef.current = setTimeout(() => {
-        videoRef.current?.play()
+      playTimerRef.current = window.setTimeout(() => {
+        void videoRef.current?.play().catch((_e: unknown) => { return _e })
         playTimerRef.current = null
       }, 200)
     }
   }, [props.paused, props.currentTime, props.playbackRate])
+
   useEffect(() => {
     if (!videoRef.current) return
     videoRef.current.playbackRate = props.playbackRate
   }, [props.playbackRate])
+
   useEffect(() => {
     if (!videoRef.current) return
     if (props.paused) {
       videoRef.current.currentTime = props.currentTime
     }
   }, [props.currentTime, props.paused])
-  return (
-    <div
-      className={cls(styles.root, `c${props.camera}`)}
-      onClick={props.onClick}
-    >
-      <span className={styles.name}>{CameraEnum[props.camera]}</span>
-      <video
-        muted
-        className={cls(styles.video, { 'is-hidden': props.isActive })}
-        ref={videoRef}
-        src={props.src}
-      >
-        <source src={props.src} type="video/mp4" />
-      </video>
-    </div>
-  )
-}
 
-MiniPlay.defaultProps = {
-  currentTime: 0,
-  camera: 0,
-  isActive: false,
-  paused: false,
-  playbackRate: 1,
+  return (
+    <video
+      muted
+      ref={videoRef}
+      src={props.src}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
+      onClick={props.onClick}
+    />
+  )
 }
 
 export default MiniPlay
