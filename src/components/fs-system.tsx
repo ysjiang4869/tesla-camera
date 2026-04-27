@@ -13,10 +13,8 @@ import {
 import { convertFileSrc } from '@tauri-apps/api/tauri'
 import { open } from '@tauri-apps/api/dialog'
 import { readTextFile, readDir, readBinaryFile } from '@tauri-apps/api/fs'
-import {
-  getClipPrefix, isDashcamMetaFile, mergeDashcamPoints, parseDashcamTelemetry,
-} from '../dashcam'
-import { DEFAULT_THUMBNAIL, getCachedVideoThumbnail } from '../thumbnail'
+import { DEFAULT_THUMBNAIL } from '../thumbnail'
+import { getCachedVideoThumbnailTauri, clearThumbnailTauriState } from '../thumbnail-tauri'
 
 const THUMBNAIL_CONCURRENCY = 4
 
@@ -134,63 +132,36 @@ async function hydrateGroupThumbnails(
   isCanceled: () => boolean,
   onChange: (next: OriginVideoGroup[]) => void,
 ) {
-  if (!groups.length) {
-    return
-  }
-  let cursor = 0
+  if (!groups.length) return
+
   let changed = false
   let changedCount = 0
   const flush = () => {
-    if (!changed || isCanceled()) {
-      return
-    }
+    if (!changed || isCanceled()) return
     changed = false
     onChange([...groups])
   }
 
-  async function worker() {
-    while (!isCanceled()) {
-      const index = cursor
-      cursor += 1
-      if (index >= groups.length) {
-        return
-      }
-      const group = groups[index]
-      const candidates = group.clips.filter(item => item.src_f).slice(0, 3)
-      if (!candidates.length) {
-        continue
-      }
-      let thumbnail: string | undefined
-      for (let i = 0; i < candidates.length; i++) {
-        if (isCanceled()) {
-          return
-        }
-        const clip = candidates[i]
-        try {
-          thumbnail = await getCachedVideoThumbnail(clip.src_f.path, async () => (await clip.src_f.get()).url)
-        } catch {
-          thumbnail = undefined
-        }
-        if (thumbnail) {
-          break
-        }
-      }
-      if (isCanceled()) {
-        return
-      }
+  await Promise.all(groups.map(async (group, index) => {
+    if (isCanceled()) return
+    const clip = group.clips.find(item => item.src_f?.path)
+    if (!clip) return
+    try {
+      const thumbnail = await getCachedVideoThumbnailTauri(
+        clip.src_f.path,
+        index < THUMBNAIL_CONCURRENCY ? 'visible' : 'background',
+      )
+      if (isCanceled()) return
       if (thumbnail && thumbnail !== group.thumbnail) {
         group.thumbnail = thumbnail
         changed = true
         changedCount += 1
-        if (changedCount % 8 === 0) {
-          flush()
-        }
+        if (changedCount % 8 === 0) flush()
       }
+    } catch {
+      // ignore
     }
-  }
-
-  const workerCount = Math.min(THUMBNAIL_CONCURRENCY, groups.length)
-  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  }))
   flush()
 }
 
@@ -246,6 +217,7 @@ const FsSystem: React.FC<FsSystemProps> = props => {
   const loadTokenRef = React.useRef(0)
 
   async function onSelectFile() {
+    clearThumbnailTauriState()
     const loadToken = loadTokenRef.current + 1
     loadTokenRef.current = loadToken
     const teslaCamDir = await open({
@@ -259,39 +231,26 @@ const FsSystem: React.FC<FsSystemProps> = props => {
     readDir(teslaCamDir as string, { recursive: true }).then(async res => {
       const files = getDirFiles(res as TauriFile[])
       const videos = convertVideoFiles(files)
-      const videoByPrefix = videos.reduce<Record<string, OriginVideo>>((prev, item) => {
-        const prefix = dayjs(item.time).format('YYYY-MM-DD_HH-mm-ss')
-        prev[prefix] = item
-        return prev
-      }, {})
       const eventsFiles = files.filter(({ path }) => /.+event.json$/i.test(path))
-      const dashcamFiles = files.filter(({ path }) => isDashcamMetaFile(path))
       const eventByDir: Record<string, EventJson> = {}
-      for (let i = 0; i < eventsFiles.length; i++) {
-        const file = eventsFiles[i]
-        try {
-          const eventJsonText = await readTextFile(file.path)
-          eventByDir[normalizeDirPath(getParentDir(file.path))] = JSON.parse(eventJsonText)
-        } catch {
-          // ignore malformed event files
-        }
+
+      // 并行读取所有 event.json（最多 8 个并发）
+      const EVENT_CONCURRENCY = 8
+      for (let i = 0; i < eventsFiles.length; i += EVENT_CONCURRENCY) {
+        const batch = eventsFiles.slice(i, i + EVENT_CONCURRENCY)
+        await Promise.all(batch.map(async (file) => {
+          try {
+            const text = await readTextFile(file.path)
+            eventByDir[normalizeDirPath(getParentDir(file.path))] = JSON.parse(text)
+          } catch {
+            // ignore malformed event files
+          }
+        }))
       }
-      for (let i = 0; i < dashcamFiles.length; i++) {
-        const file = dashcamFiles[i]
-        const prefix = getClipPrefix(file.name) ?? getClipPrefix(file.path)
-        if (!prefix) {
-          continue
-        }
-        const current = videoByPrefix[prefix]
-        if (!current) {
-          continue
-        }
-        const text = await readTextFile(file.path)
-        const points = parseDashcamTelemetry(text, file.path, current.time)
-        if (points.length) {
-          current.dashcam = mergeDashcamPoints(current.dashcam, points)
-        }
-      }
+
+      // dashcam CSV/JSON 文件体积大且数量多，改为点击时从 mp4 按需解析
+      // 此处跳过，避免启动时产生大量串行 IPC 读取
+
       const groups = buildVideoGroups(videos, eventByDir)
       props.onAccess(groups)
       void hydrateGroupThumbnails(

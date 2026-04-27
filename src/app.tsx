@@ -393,18 +393,12 @@ function App() {
   }
 
   async function loadVideo(origin: OriginVideo): Promise<Video> {
-    const [src_f_file, src_b_file, src_l_file, src_r_file] = [
-      await origin.src_f.get(),
-      await origin.src_b.get(),
-      await origin.src_l.get(),
-      await origin.src_r.get(),
-    ]
-    if (!origin.dashcam?.length && origin.src_f.getBuffer) {
-      try {
-        const frontBuffer = await origin.src_f.getBuffer()
-        origin.dashcam = parseDashcamFromMp4(frontBuffer)
-      } catch { /* ignore malformed telemetry */ }
-    }
+    const [src_f_file, src_b_file, src_l_file, src_r_file] = await Promise.all([
+      origin.src_f.get(),
+      origin.src_b.get(),
+      origin.src_l.get(),
+      origin.src_r.get(),
+    ])
     return {
       ...origin,
       src_f: src_f_file.url, src_f_name: src_f_file.name, src_f_path: origin.src_f.path,
@@ -412,6 +406,30 @@ function App() {
       src_l: src_l_file.url, src_l_name: src_l_file.name, src_l_path: origin.src_l.path,
       src_r: src_r_file.url, src_r_name: src_r_file.name, src_r_path: origin.src_r.path,
       dashcam: origin.dashcam,
+    }
+  }
+
+  async function hydrateDashcam(groupId: string, originClips: OriginVideo[]) {
+    for (const origin of originClips) {
+      if (origin.dashcam?.length || !origin.src_f?.getBuffer) continue
+      try {
+        const frontBuffer = await origin.src_f.getBuffer()
+        origin.dashcam = parseDashcamFromMp4(frontBuffer)
+      } catch { /* ignore malformed telemetry */ }
+      setState(prev => {
+        if (prev.currentGroup?.id !== groupId) return prev
+        const idx = prev.currentGroup.videos.findIndex(v => v.time === origin.time)
+        if (idx < 0) return prev
+        const updatedVideos = [...prev.currentGroup.videos]
+        updatedVideos[idx] = { ...updatedVideos[idx], dashcam: origin.dashcam }
+        return {
+          ...prev,
+          currentGroup: { ...prev.currentGroup, videos: updatedVideos },
+          current: prev.current?.time === origin.time
+            ? { ...prev.current, dashcam: origin.dashcam }
+            : prev.current,
+        }
+      })
     }
   }
 
@@ -435,6 +453,7 @@ function App() {
       thumbnail: originGroup.thumbnail,
     }
     setState(prev => ({ ...prev, currentGroup, current: videos[0] }))
+    void hydrateDashcam(groupId, originGroup.clips)
   }
 
   function onCurrentVideoChange(video: Video) {

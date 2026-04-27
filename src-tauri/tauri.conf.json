@@ -28,6 +28,9 @@
       "fs": {
         "readFile": true,
         "readDir": true,
+        "writeFile": true,
+        "createDir": true,
+        "removeFile": true,
         "scope": ["**"]
       },
       "path": {
