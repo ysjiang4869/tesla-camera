@@ -5,24 +5,31 @@ import {
 } from '@fluentui/react-components'
 import { ApprovalsApp24Regular } from '@fluentui/react-icons'
 import pkgJson from '../../package.json'
-import { checkUpdate, installUpdate, onUpdaterEvent } from '@tauri-apps/api/updater'
-import { message } from '@tauri-apps/api/dialog'
+import { check } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
+import { ask, message } from '@tauri-apps/plugin-dialog'
 
-onUpdaterEvent(({ error, status }) => {
-  console.log('Updater event', error, status)
-})
-
-const ExportTask: React.FC = () => {
+const CheckUpdate: React.FC = () => {
   const onCheck = async () => {
     try {
-      const updateFlag = await checkUpdate()
-      if (updateFlag.shouldUpdate) {
-        await installUpdate()
+      const update = await check()
+      if (!update) {
+        await message('当前已是最新版本', { title: '检查更新' })
+        return
       }
+      const confirmed = await ask(
+        `发现新版本 v${update.version}，是否立即下载并安装？`,
+        { title: '检查更新' },
+      )
+      if (!confirmed) {
+        return
+      }
+      await update.downloadAndInstall()
+      await relaunch()
     } catch (e) {
-      message(JSON.stringify(e), {
+      message(e instanceof Error ? e.message : JSON.stringify(e), {
         title: '更新发生错误',
-        type: 'error',
+        kind: 'error',
       })
     }
   }
@@ -36,4 +43,4 @@ const ExportTask: React.FC = () => {
   )
 }
 
-export default ExportTask
+export default CheckUpdate

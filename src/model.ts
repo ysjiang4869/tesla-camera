@@ -166,5 +166,4 @@ export interface EventJson {
 export interface TauriFile {
   name: string
   path: string
-  children?: TauriFile[]
 }

@@ -3,3 +3,5 @@
 /target/
 binaries
 !binaries/.gitkeep
+# Generated capability schemas
+gen/schemas

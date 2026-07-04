@@ -68,14 +68,14 @@ parse_telemetry(path)     → Rust 读 mp4 box 解析遥测，只返回数据点
 
 ### 阶段 1：Tauri v2 迁移（地基）
 
-- [ ] `tauri` 2.x + `@tauri-apps/api` 2.x；`fs`/`dialog`/`shell`/`notification`/`updater`
+- [x] `tauri` 2.x + `@tauri-apps/api` 2.x；`fs`/`dialog`/`shell`/`notification`/`updater`
       改为官方插件（`@tauri-apps/plugin-*` + Cargo `tauri-plugin-*`）
-- [ ] `tauri.conf.json` 重写为 v2 schema；allowlist 改为 capabilities/permissions 模型
-- [ ] 平台检测：`window.__TAURI_IPC__` → `isTauri()`（`@tauri-apps/api/core`）
-- [ ] `convertFileSrc` 改用官方 API（删除 `thumbnail-tauri.ts` 手写实现）
-- [ ] `src-tauri/src/main.rs` 适配 v2 Builder/插件注册
-- [ ] 更新 GitHub Actions 构建任务与 updater 配置
-- [ ] 验收：功能与现状对齐（选目录、列表、播放、导出、检查更新），独立 commit
+- [x] `tauri.conf.json` 重写为 v2 schema；allowlist 改为 capabilities/permissions 模型
+- [x] 平台检测：`window.__TAURI_IPC__` → `isTauri()`（`@tauri-apps/api/core`）
+- [x] `convertFileSrc` 改用官方 API（删除 `thumbnail-tauri.ts` 手写实现）
+- [x] `src-tauri/src/main.rs` 适配 v2 Builder/插件注册
+- [x] 更新 GitHub Actions 构建任务与 updater 配置
+- [x] 验收：功能与现状对齐（选目录、列表、播放、导出、检查更新），独立 commit
 
 ### 阶段 2：Rust 下沉（解决问题本身）
 

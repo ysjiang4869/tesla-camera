@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { isTauri } from '@tauri-apps/api/core'
 import dayjs from 'dayjs'
 import Player from './components/player'
 import DirectoryAccess from './components/directory-access'
@@ -540,11 +541,11 @@ function App() {
         <div style={topbarStyles.bar}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             <div style={topbarStyles.group}>
-              {window.__TAURI_IPC__
+              {isTauri()
                 ? <FsSystem onAccess={onFileSystemAccess} />
                 : <DirectoryAccess onAccess={onFileSystemAccess} />}
               <div style={topbarStyles.divider} />
-              {Boolean(window.__TAURI_IPC__) && state.current
+              {isTauri() && state.current
                 ? <FfmpegExport video={state.current} />
                 : <FfmpegTerminal video={state.current} />}
             </div>
@@ -566,7 +567,7 @@ function App() {
               >
                 {showDashcamData ? <Icons.Eye size={14} /> : <Icons.EyeOff size={14} />}
               </button>
-              {Boolean(window.__TAURI_IPC__) && <CheckUpdate />}
+              {isTauri() && <CheckUpdate />}
               <button
                 style={{ ...topbarStyles.btn, ...topbarStyles.iconOnly }}
                 title="查看源代码"

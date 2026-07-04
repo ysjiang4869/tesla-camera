@@ -1,6 +1,7 @@
-import { Command } from '@tauri-apps/api/shell'
-import { exists, createDir, removeFile } from '@tauri-apps/api/fs'
+import { Command } from '@tauri-apps/plugin-shell'
+import { exists, mkdir, remove } from '@tauri-apps/plugin-fs'
 import { appCacheDir, join } from '@tauri-apps/api/path'
+import { convertFileSrc } from '@tauri-apps/api/core'
 import { thumbnailQueue } from './thumbnail-queue'
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -13,7 +14,7 @@ async function getCacheDir(): Promise<string> {
   const base = await appCacheDir()
   const dir = await join(base, 'thumbnails')
   if (!await exists(dir)) {
-    await createDir(dir, { recursive: true })
+    await mkdir(dir, { recursive: true })
   }
   cacheDir = dir
   return dir
@@ -25,13 +26,6 @@ async function hashPath(path: string): Promise<string> {
   return Array.from(new Uint8Array(hashBuffer))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
-}
-
-function convertFileSrc(filePath: string, protocol = 'asset'): string {
-  const path = encodeURIComponent(filePath)
-  return navigator.userAgent.includes('Windows')
-    ? `https://${protocol}.localhost/${path}`
-    : `${protocol}://localhost/${path}`
 }
 
 const pendingMap = new Map<string, Promise<string | undefined>>()
@@ -77,7 +71,7 @@ async function extractThumbnail(videoPath: string): Promise<string | undefined> 
       if (data.code === 0 && await exists(cacheFile)) {
         resolve(convertFileSrc(cacheFile))
       } else {
-        await removeFile(cacheFile).catch(noop)
+        await remove(cacheFile).catch(noop)
         resolve(undefined)
       }
     })

@@ -24,12 +24,12 @@ import {
 } from '@fluentui/react-components'
 import { ResizeVideo24Filled } from '@fluentui/react-icons'
 import { type Video, type ExportTaskType, ExportStatusEnum } from '../model'
-import { open } from '@tauri-apps/api/dialog'
-import { Command } from '@tauri-apps/api/shell'
+import { open } from '@tauri-apps/plugin-dialog'
+import { Command } from '@tauri-apps/plugin-shell'
 import { getName } from '@tauri-apps/api/app'
 import { resolveResource, tempDir } from '@tauri-apps/api/path'
-import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification'
-import { writeTextFile } from '@tauri-apps/api/fs'
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
+import { writeTextFile } from '@tauri-apps/plugin-fs'
 import ExportTask from './export-task'
 import { durationToMs } from '../tool'
 import { buildDashcamSrt, escapeFfmpegPath } from '../dashcam'
@@ -97,7 +97,7 @@ const doTask = async (
   if (includeDashcam && video.dashcam?.length) {
     const srt = buildDashcamSrt(video.dashcam)
     if (srt) {
-      const srtPath = `${await tempDir()}tesla-camera-dashcam-${video.time}-${camera}.srt`
+      const srtPath = `${await tempDir()}/tesla-camera-dashcam-${video.time}-${camera}.srt`
       await writeTextFile(srtPath, srt)
       filters.push(`subtitles='${escapeFfmpegPath(srtPath)}':force_style='FontSize=20,BorderStyle=3,Outline=1'`)
     }

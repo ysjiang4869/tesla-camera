@@ -10,9 +10,9 @@ import {
   type OriginVideo, type OriginVideoGroup, TypeEnum, type TauriFile, type EventJson,
   type FileData,
 } from '../model'
-import { convertFileSrc } from '@tauri-apps/api/tauri'
-import { open } from '@tauri-apps/api/dialog'
-import { readTextFile, readDir, readBinaryFile } from '@tauri-apps/api/fs'
+import { convertFileSrc } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
+import { readTextFile, readDir, readFile } from '@tauri-apps/plugin-fs'
 import { DEFAULT_THUMBNAIL } from '../thumbnail'
 import { getCachedVideoThumbnailTauri, clearThumbnailTauriState } from '../thumbnail-tauri'
 
@@ -48,15 +48,18 @@ function pathToType(path: string) {
   return TypeEnum.所有
 }
 
-function getDirFiles(files: TauriFile[]) {
+// Tauri v2 的 readDir 不支持 recursive，此处手动递归；阶段 2 将整体下沉为 Rust scan_teslacam 命令
+async function getDirFiles(dir: string): Promise<TauriFile[]> {
+  const entries = await readDir(dir)
   const result: TauriFile[] = []
-  files.forEach(item => {
-    if (item.children?.length) {
-      result.push(...getDirFiles(item.children))
-    } else {
-      result.push(item)
+  await Promise.all(entries.map(async (entry) => {
+    const path = `${dir}/${entry.name}`
+    if (entry.isDirectory) {
+      result.push(...await getDirFiles(path))
+    } else if (entry.isFile) {
+      result.push({ name: entry.name, path })
     }
-  })
+  }))
   return result
 }
 
@@ -191,7 +194,7 @@ function convertVideoFiles(videoFiles: TauriFile[]): OriginVideo[] {
         })
       },
       async getBuffer() {
-        const binary = await readBinaryFile(path)
+        const binary = await readFile(path)
         return binary.buffer.slice(binary.byteOffset, binary.byteOffset + binary.byteLength)
       },
       name,
@@ -228,8 +231,7 @@ const FsSystem: React.FC<FsSystemProps> = props => {
     if (!teslaCamDir) {
       return
     }
-    readDir(teslaCamDir as string, { recursive: true }).then(async res => {
-      const files = getDirFiles(res as TauriFile[])
+    getDirFiles(teslaCamDir as string).then(async files => {
       const videos = convertVideoFiles(files)
       const eventsFiles = files.filter(({ path }) => /.+event.json$/i.test(path))
       const eventByDir: Record<string, EventJson> = {}
