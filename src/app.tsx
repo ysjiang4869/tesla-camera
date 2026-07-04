@@ -398,16 +398,15 @@ function App() {
     return () => { document.onkeydown = null }
   }, [])
 
-  useEffect(() => () => {
-    revokeGroupUrls(state.currentGroup)
-  }, [state.currentGroup])
-
   function onFileSystemAccess(groups: OriginVideoGroup[]) {
     requestedThumbsRef.current = new Set()
+    const previousGroup = stateRef.current.currentGroup
+    const keepCurrent = previousGroup && groups.some(item => item.id === previousGroup.id)
+    if (!keepCurrent) {
+      revokeGroupUrls(previousGroup)
+    }
     setState((prev) => {
-      const currentGroupId = prev.currentGroup?.id
-      const nextMeta = currentGroupId ? groups.find(item => item.id === currentGroupId) : undefined
-      if (!nextMeta || !prev.currentGroup) {
+      if (!keepCurrent) {
         return { ...prev, list: groups, current: undefined, currentGroup: undefined }
       }
       return { ...prev, list: groups }
@@ -438,6 +437,7 @@ function App() {
       try {
         origin.dashcam = await origin.src_f.getDashcam()
       } catch { /* ignore malformed telemetry */ }
+      if (!origin.dashcam?.length) continue
       setState(prev => {
         if (prev.currentGroup?.id !== groupId) return prev
         const idx = prev.currentGroup.videos.findIndex(v => v.time === origin.time)

@@ -790,6 +790,12 @@ const Player: React.FC<PlayerProps> = (props) => {
     () => (props.videos ?? []).filter(video => Boolean(getFirstAvailableSrc(video))),
     [props.videos],
   )
+  // 遥测异步到达时 videos 数组引用会更新但片段本身不变，此时不能重置播放
+  const videosKey = useMemo(
+    () => videos.map(video => getFirstAvailableSrc(video)).join('|'),
+    [videos],
+  )
+  const loadedVideosKeyRef = useRef<string>()
   const currentVideo = videos[currentClipIndex]
   const showPlayerDebug = localStorage.getItem('playerDebug') === '1'
   const dashcamPoint = findDashcamPoint(currentVideo?.dashcam, currentTime)
@@ -854,6 +860,8 @@ const Player: React.FC<PlayerProps> = (props) => {
   // ── Effects ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (loadedVideosKeyRef.current === videosKey) return
+    loadedVideosKeyRef.current = videosKey
     setCurrentClipIndex(0)
     setCurrentTime(0)
     setCurrentTimelineTime(0)
@@ -888,7 +896,7 @@ const Player: React.FC<PlayerProps> = (props) => {
       }
     }
     for (let i = 0; i < workerCount; i++) void worker()
-  }, [videos])
+  }, [videosKey, videos])
 
   useEffect(() => {
     setCurrentTimelineTime((clipStarts[currentClipIndex] ?? 0) + currentTime)

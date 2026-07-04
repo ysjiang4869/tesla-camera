@@ -106,7 +106,54 @@ fn serve(request: Request<Vec<u8>>) -> Result<Response<Vec<u8>>, StatusCode> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_range;
+    use super::{handle, parse_range};
+    use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+    use tauri::http::{header, Request};
+
+    /// 模拟 macOS 上 convertFileSrc(path, 'stream') 的完整链路：
+    /// stream://localhost/<encodeURIComponent(绝对路径)>
+    #[test]
+    fn serves_encoded_absolute_path() {
+        let path = std::env::temp_dir().join("stream_handler_test.mp4");
+        std::fs::write(&path, b"0123456789abcdef").unwrap();
+        let encoded = utf8_percent_encode(path.to_str().unwrap(), NON_ALPHANUMERIC).to_string();
+        let uri = format!("stream://localhost/{encoded}");
+
+        // WKWebView 首个探测请求
+        let request = Request::builder()
+            .uri(uri.clone())
+            .header(header::RANGE, "bytes=0-1")
+            .body(Vec::new())
+            .unwrap();
+        let response = handle(request);
+        assert_eq!(response.status(), 206);
+        assert_eq!(response.body(), b"01");
+        assert_eq!(
+            response.headers().get(header::CONTENT_RANGE).unwrap(),
+            "bytes 0-1/16"
+        );
+
+        // 区间请求
+        let request = Request::builder()
+            .uri(uri.clone())
+            .header(header::RANGE, "bytes=4-7")
+            .body(Vec::new())
+            .unwrap();
+        let response = handle(request);
+        assert_eq!(response.status(), 206);
+        assert_eq!(response.body(), b"4567");
+
+        // 无 Range 的整文件请求
+        let request = Request::builder().uri(uri).body(Vec::new()).unwrap();
+        let response = handle(request);
+        assert_eq!(response.status(), 200);
+        assert_eq!(response.body().len(), 16);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "video/mp4"
+        );
+        std::fs::remove_file(&path).ok();
+    }
 
     #[test]
     fn parses_range_specs() {
