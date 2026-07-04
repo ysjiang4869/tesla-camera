@@ -14,8 +14,6 @@ import {
 } from '../dashcam'
 import { DEFAULT_THUMBNAIL, getCachedVideoThumbnail } from '../thumbnail'
 
-const THUMBNAIL_CONCURRENCY = 4
-
 interface DirectoryAccessProps {
   onAccess: (accessFile: OriginVideoGroup[]) => void
 }
@@ -122,69 +120,27 @@ function buildVideoGroups(videos: OriginVideo[], eventByDir: Record<string, Even
   return groups
 }
 
-async function hydrateGroupThumbnails(
-  groups: OriginVideoGroup[],
-  isCanceled: () => boolean,
-  onChange: (next: OriginVideoGroup[]) => void,
-) {
-  if (!groups.length) {
-    return
-  }
-  let cursor = 0
-  let changed = false
-  let changedCount = 0
-  const flush = () => {
-    if (!changed || isCanceled()) {
+function attachThumbnailLoaders(groups: OriginVideoGroup[]) {
+  groups.forEach((group) => {
+    const candidates = group.clips.filter(item => item.src_f).slice(0, 3)
+    if (!candidates.length) {
       return
     }
-    changed = false
-    onChange([...groups])
-  }
-
-  async function worker() {
-    while (!isCanceled()) {
-      const index = cursor
-      cursor += 1
-      if (index >= groups.length) {
-        return
-      }
-      const group = groups[index]
-      const candidates = group.clips.filter(item => item.src_f).slice(0, 3)
-      if (!candidates.length) {
-        continue
-      }
-      let thumbnail: string | undefined
+    group.loadThumbnail = async () => {
       for (let i = 0; i < candidates.length; i++) {
-        if (isCanceled()) {
-          return
-        }
         const clip = candidates[i]
         try {
-          thumbnail = await getCachedVideoThumbnail(clip.src_f.path, async () => (await clip.src_f.get()).url)
+          const thumbnail = await getCachedVideoThumbnail(clip.src_f.path, async () => (await clip.src_f.get()).url)
+          if (thumbnail) {
+            return thumbnail
+          }
         } catch {
-          thumbnail = undefined
-        }
-        if (thumbnail) {
-          break
+          // 尝试下一段
         }
       }
-      if (isCanceled()) {
-        return
-      }
-      if (thumbnail && thumbnail !== group.thumbnail) {
-        group.thumbnail = thumbnail
-        changed = true
-        changedCount += 1
-        if (changedCount % 8 === 0) {
-          flush()
-        }
-      }
+      return undefined
     }
-  }
-
-  const workerCount = Math.min(THUMBNAIL_CONCURRENCY, groups.length)
-  await Promise.all(Array.from({ length: workerCount }, () => worker()))
-  flush()
+  })
 }
 
 function convertFiles(videoFiles: VideoFile[]): OriginVideo[] {
@@ -278,12 +234,11 @@ const DirectoryAccess: React.FC<React.PropsWithChildren<DirectoryAccessProps>> =
       }
     }
     const groups = buildVideoGroups(videos, eventByDir)
+    attachThumbnailLoaders(groups)
+    if (loadTokenRef.current !== loadToken) {
+      return
+    }
     props.onAccess(groups)
-    void hydrateGroupThumbnails(
-      groups,
-      () => loadTokenRef.current !== loadToken,
-      (next) => props.onAccess(next),
-    )
   }
   return (
     <Tooltip content={<>选择车载U盘中的<Body1Strong>TeslaCam</Body1Strong>目录，或者是<Body1Strong>TeslaCam</Body1Strong>文件目录的拷贝</>} relationship="label">

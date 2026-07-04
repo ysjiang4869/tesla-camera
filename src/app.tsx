@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
 import dayjs from 'dayjs'
 import Player from './components/player'
@@ -299,12 +299,14 @@ function revokeGroupUrls(group?: VideoGroup) {
 
 // ─── ClipCard ─────────────────────────────────────────────────────────────────
 
-function ClipCard({ item, active, onSelect }: {
+const ClipCard = memo(function ClipCard({ item, active, onSelect, onVisible }: {
   item: OriginVideoGroup
   active: boolean
   onSelect: (id: string) => void
+  onVisible: (item: OriginVideoGroup) => void
 }) {
   const [hover, setHover] = useState(false)
+  const rootRef = useRef<HTMLButtonElement>(null)
   const pill = TYPE_PILL_STYLE[item.type]
   const cardStyle = {
     ...sidebarStyles.card,
@@ -312,8 +314,23 @@ function ClipCard({ item, active, onSelect }: {
     ...(active ? sidebarStyles.cardActive : {}),
   }
 
+  // 进入视口（含 200px 预取余量）才请求缩略图
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el || !item.loadThumbnail) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        observer.disconnect()
+        onVisible(item)
+      }
+    }, { rootMargin: '200px' })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [item, onVisible])
+
   return (
     <button
+      ref={rootRef}
       style={cardStyle}
       type="button"
       onClick={() => onSelect(item.id)}
@@ -356,7 +373,7 @@ function ClipCard({ item, active, onSelect }: {
       </div>
     </button>
   )
-}
+})
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -370,6 +387,9 @@ function App() {
     list: [],
     events: [],
   })
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const requestedThumbsRef = useRef(new Set<string>())
 
   useEffect(() => {
     document.onkeydown = (e: KeyboardEvent) => {
@@ -383,6 +403,7 @@ function App() {
   }, [state.currentGroup])
 
   function onFileSystemAccess(groups: OriginVideoGroup[]) {
+    requestedThumbsRef.current = new Set()
     setState((prev) => {
       const currentGroupId = prev.currentGroup?.id
       const nextMeta = currentGroupId ? groups.find(item => item.id === currentGroupId) : undefined
@@ -434,11 +455,25 @@ function App() {
     }
   }
 
-  async function onSelectGroup(groupId: string) {
-    const originGroup = state.list.find(item => item.id === groupId)
+  const onCardVisible = useCallback(async (item: OriginVideoGroup) => {
+    if (!item.loadThumbnail || requestedThumbsRef.current.has(item.id)) return
+    requestedThumbsRef.current.add(item.id)
+    try {
+      const thumbnail = await item.loadThumbnail()
+      if (!thumbnail) return
+      setState(prev => ({
+        ...prev,
+        list: prev.list.map(group => (group.id === item.id ? { ...group, thumbnail } : group)),
+      }))
+    } catch { /* 保留占位图 */ }
+  }, [])
+
+  const onSelectGroup = useCallback(async (groupId: string) => {
+    const { list, currentGroup: previousGroup } = stateRef.current
+    const originGroup = list.find(item => item.id === groupId)
     if (!originGroup) return
     currentGroupIdRef.current = groupId
-    revokeGroupUrls(state.currentGroup)
+    revokeGroupUrls(previousGroup)
     const videos = await Promise.all(originGroup.clips.map(item => loadVideo(item)))
     const currentGroup: VideoGroup = {
       id: originGroup.id,
@@ -456,7 +491,7 @@ function App() {
     }
     setState(prev => ({ ...prev, currentGroup, current: videos[0] }))
     void hydrateDashcam(groupId, originGroup.clips)
-  }
+  }, [])
 
   function onCurrentVideoChange(video: Video) {
     setState(prev => ({ ...prev, current: video }))
@@ -531,6 +566,7 @@ function App() {
               item={item}
               key={item.id}
               onSelect={onSelectGroup}
+              onVisible={onCardVisible}
             />
           ))}
         </div>

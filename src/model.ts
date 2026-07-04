@@ -62,6 +62,8 @@ export interface OriginVideoGroup {
   longitude?: number
   reason?: string
   thumbnail?: string
+  /** 懒加载缩略图：卡片进入视口时才调用（各平台自行实现） */
+  loadThumbnail?: () => Promise<string | undefined>
 }
 
 export interface OriginFSVideo {

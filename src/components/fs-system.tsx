@@ -52,6 +52,49 @@ function toNumber(value?: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+// ─── 缩略图微批处理：50ms 窗口内的可见卡片请求合并为一次 Rust 调用 ────────────
+
+interface PendingThumbnail {
+  path: string
+  resolve: (url: string | undefined) => void
+}
+
+let pendingThumbnails: PendingThumbnail[] = []
+let batchTimer: number | undefined
+
+async function flushThumbnailBatch() {
+  batchTimer = undefined
+  const batch = pendingThumbnails
+  pendingThumbnails = []
+  if (!batch.length) {
+    return
+  }
+  const byPath = new Map(batch.map(item => [item.path, item]))
+  const onThumbnail = new Channel<ThumbnailResult>()
+  onThumbnail.onmessage = (message) => {
+    const pending = byPath.get(message.videoPath)
+    if (pending) {
+      byPath.delete(message.videoPath)
+      pending.resolve(message.cachePath ? convertFileSrc(message.cachePath) : undefined)
+    }
+  }
+  try {
+    await invoke('request_thumbnails', { paths: batch.map(item => item.path), onThumbnail })
+  } catch {
+    // 取消或 ffmpeg 不可用：下方统一按无缩略图收尾
+  }
+  byPath.forEach(item => item.resolve(undefined))
+}
+
+function requestThumbnail(path: string): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    pendingThumbnails.push({ path, resolve })
+    if (batchTimer === undefined) {
+      batchTimer = window.setTimeout(() => { void flushThumbnailBatch() }, 50)
+    }
+  })
+}
+
 function toFileData(path: string): FileData {
   const name = path.slice(path.lastIndexOf('/') + 1)
   return {
@@ -89,6 +132,7 @@ function convertScanGroups(scanGroups: ScanGroup[]): OriginVideoGroup[] {
       }
       return video as OriginVideo
     })
+    const front = item.clips.find(clip => clip.front)?.front
     const group: OriginVideoGroup = {
       id: item.id,
       title: item.title,
@@ -97,6 +141,7 @@ function convertScanGroups(scanGroups: ScanGroup[]): OriginVideoGroup[] {
       dir: item.dir,
       clips,
       thumbnail: DEFAULT_THUMBNAIL,
+      loadThumbnail: front ? () => requestThumbnail(front) : undefined,
     }
     if (item.event) {
       group.event = dayjs(item.event.timestamp).valueOf()
@@ -107,56 +152,6 @@ function convertScanGroups(scanGroups: ScanGroup[]): OriginVideoGroup[] {
     }
     return group
   })
-}
-
-async function hydrateGroupThumbnails(
-  groups: OriginVideoGroup[],
-  isCanceled: () => boolean,
-  onChange: (next: OriginVideoGroup[]) => void,
-) {
-  const groupByFront = new Map<string, OriginVideoGroup>()
-  groups.forEach((group) => {
-    const front = group.clips.find(clip => clip.src_f?.path)?.src_f.path
-    if (front && !groupByFront.has(front)) {
-      groupByFront.set(front, group)
-    }
-  })
-  const paths = [...groupByFront.keys()]
-  if (!paths.length) {
-    return
-  }
-
-  let changed = false
-  let changedCount = 0
-  const flush = () => {
-    if (!changed || isCanceled()) return
-    changed = false
-    onChange([...groups])
-  }
-
-  const onThumbnail = new Channel<ThumbnailResult>()
-  onThumbnail.onmessage = (message) => {
-    if (isCanceled() || !message.cachePath) {
-      return
-    }
-    const group = groupByFront.get(message.videoPath)
-    if (!group) {
-      return
-    }
-    const url = convertFileSrc(message.cachePath)
-    if (url !== group.thumbnail) {
-      group.thumbnail = url
-      changed = true
-      changedCount += 1
-      if (changedCount % 8 === 0) flush()
-    }
-  }
-  try {
-    await invoke('request_thumbnails', { paths, onThumbnail })
-  } catch {
-    // 取消或 ffmpeg 不可用时保留占位图
-  }
-  flush()
 }
 
 const FsSystem: React.FC<FsSystemProps> = props => {
@@ -178,13 +173,7 @@ const FsSystem: React.FC<FsSystemProps> = props => {
     if (loadTokenRef.current !== loadToken) {
       return
     }
-    const groups = convertScanGroups(scanGroups)
-    props.onAccess(groups)
-    void hydrateGroupThumbnails(
-      groups,
-      () => loadTokenRef.current !== loadToken,
-      (next) => props.onAccess(next),
-    )
+    props.onAccess(convertScanGroups(scanGroups))
   }
   return (
     <Tooltip

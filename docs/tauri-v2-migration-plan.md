@@ -91,9 +91,9 @@ parse_telemetry(path)     → Rust 读 mp4 box 解析遥测，只返回数据点
 
 ### 阶段 3：前端收尾
 
-- [ ] 缩略图请求改为 IntersectionObserver 驱动（视口内才请求）
-- [ ] `ClipCard` 加 `React.memo`，列表更新只换有变化的引用
-- [ ] 清理 v1 时代的绕路代码与无用依赖
+- [x] 缩略图请求改为 IntersectionObserver 驱动（视口内才请求）
+- [x] `ClipCard` 加 `React.memo`，列表更新只换有变化的引用
+- [x] 清理 v1 时代的绕路代码与无用依赖
 
 ## 四、风险点
 
