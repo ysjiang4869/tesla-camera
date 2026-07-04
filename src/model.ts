@@ -30,7 +30,8 @@ export interface ExportTaskType {
 
 export interface FileData {
   get(): Promise<{ url: string; name: string }>
-  getBuffer?: () => Promise<ArrayBuffer>
+  /** 解析该视频内嵌的行车遥测数据（各平台自行选择最优实现） */
+  getDashcam?: () => Promise<DashcamPoint[]>
   name: string
   path: string
 }

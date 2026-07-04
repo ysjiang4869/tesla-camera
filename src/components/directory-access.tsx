@@ -10,7 +10,7 @@ import {
   type OriginVideo, type OriginVideoGroup, TypeEnum, type VideoFile, type EventJson, type FileData,
 } from '../model'
 import {
-  getClipPrefix, isDashcamMetaFile, mergeDashcamPoints, parseDashcamTelemetry,
+  getClipPrefix, isDashcamMetaFile, mergeDashcamPoints, parseDashcamTelemetry, parseDashcamFromMp4,
 } from '../dashcam'
 import { DEFAULT_THUMBNAIL, getCachedVideoThumbnail } from '../thumbnail'
 
@@ -212,9 +212,9 @@ function convertFiles(videoFiles: VideoFile[]): OriginVideo[] {
           name,
         }
       },
-      async getBuffer() {
+      async getDashcam() {
         const file = await fs.getFile()
-        return file.arrayBuffer()
+        return parseDashcamFromMp4(await file.arrayBuffer())
       },
       name,
       path,

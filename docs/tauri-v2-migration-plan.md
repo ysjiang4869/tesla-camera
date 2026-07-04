@@ -79,12 +79,12 @@ parse_telemetry(path)     → Rust 读 mp4 box 解析遥测，只返回数据点
 
 ### 阶段 2：Rust 下沉（解决问题本身）
 
-- [ ] `scan_teslacam`：目录递归、文件名正则分组、event.json 解析全在 Rust 完成，
+- [x] `scan_teslacam`：目录递归、文件名正则分组、event.json 解析全在 Rust 完成，
       替代 `readDir(recursive)` 大 JSON + 前端循环 `readTextFile`
-- [ ] `request_thumbnails`：Rust 维护缓存（内存 Set + 磁盘 jpg），未命中按 8~16 个
+- [x] `request_thumbnails`：Rust 维护缓存（内存 Set + 磁盘 jpg），未命中按 8~16 个
       一批调 ffmpeg（`-hide_banner -loglevel error -nostdin`），经 v2 Channel 逐张推送
       `asset://` URL；并发/取消用 tokio 管理；删除 `thumbnail-queue.ts`、`thumbnail-tauri.ts`
-- [ ] `parse_telemetry`：把 `dashcam.ts` 的 `parseDashcamFromMp4`（mp4 box 遍历）移植到
+- [x] `parse_telemetry`：把 `dashcam.ts` 的 `parseDashcamFromMp4`（mp4 box 遍历）移植到
       Rust；`hydrateDashcam` 改为只解析当前播放的 clip
 - [ ] 验收：真实 TeslaCam 目录对拍——Rust 遥测输出与 TS 实现逐点一致；
       缩略图首屏 < 2s，全量后台完成且 UI 无卡顿

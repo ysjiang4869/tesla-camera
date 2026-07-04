@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
 import dayjs from 'dayjs'
 import Player from './components/player'
@@ -16,7 +16,6 @@ import {
   type Video,
   type VideoGroup,
 } from './model'
-import { parseDashcamFromMp4 } from './dashcam'
 
 // ─── Sidebar styles ───────────────────────────────────────────────────────────
 
@@ -362,6 +361,7 @@ function ClipCard({ item, active, onSelect }: {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 function App() {
+  const currentGroupIdRef = useRef<string>()
   const [filterType, setFilterType] = useState(TypeEnum.所有)
   const [showDashcamData, setShowDashcamData] = useState(true)
   const [searchText, setSearchText] = useState('')
@@ -412,10 +412,10 @@ function App() {
 
   async function hydrateDashcam(groupId: string, originClips: OriginVideo[]) {
     for (const origin of originClips) {
-      if (origin.dashcam?.length || !origin.src_f?.getBuffer) continue
+      if (currentGroupIdRef.current !== groupId) return
+      if (origin.dashcam?.length || !origin.src_f?.getDashcam) continue
       try {
-        const frontBuffer = await origin.src_f.getBuffer()
-        origin.dashcam = parseDashcamFromMp4(frontBuffer)
+        origin.dashcam = await origin.src_f.getDashcam()
       } catch { /* ignore malformed telemetry */ }
       setState(prev => {
         if (prev.currentGroup?.id !== groupId) return prev
@@ -437,6 +437,7 @@ function App() {
   async function onSelectGroup(groupId: string) {
     const originGroup = state.list.find(item => item.id === groupId)
     if (!originGroup) return
+    currentGroupIdRef.current = groupId
     revokeGroupUrls(state.currentGroup)
     const videos = await Promise.all(originGroup.clips.map(item => loadVideo(item)))
     const currentGroup: VideoGroup = {
