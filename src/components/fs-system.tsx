@@ -99,7 +99,8 @@ function toFileData(path: string): FileData {
   const name = path.slice(path.lastIndexOf('/') + 1)
   return {
     async get() {
-      return { url: convertFileSrc(path), name }
+      // 视频走自定义 stream 协议（Range 流式），asset 协议对媒体支持不佳
+      return { url: convertFileSrc(path, 'stream'), name }
     },
     async getDashcam() {
       return invoke<DashcamPoint[]>('parse_telemetry', { path })

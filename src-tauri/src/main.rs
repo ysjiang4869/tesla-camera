@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod scan;
+mod stream;
 mod telemetry;
 mod thumbnails;
 
@@ -14,6 +15,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(thumbnails::ThumbState::default())
+        .register_uri_scheme_protocol("stream", |_ctx, request| stream::handle(request))
         .invoke_handler(tauri::generate_handler![
             scan::scan_teslacam,
             telemetry::parse_telemetry,

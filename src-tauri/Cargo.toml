@@ -26,6 +26,7 @@ tauri-plugin-process = "2"
 chrono = "0.4.45"
 sha1 = "0.10.6"
 tokio = { version = "1.52.3", features = ["sync"] }
+percent-encoding = "2.3.2"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
