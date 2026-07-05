@@ -51,7 +51,7 @@
   "identifier": "mario34.top",
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZFODgwNkZFNEU4OTkxQTcKUldTbmtZbE8vZ2FJL2dQNjExUng4bzJiQS9ZVFRBYytjWTBJTE94ZE5kMUhUWEFaWjFKci9Ya28K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJEMEY2QkJCQ0FBQTZBRjIKUldUeWFxckt1MnNQTFhEN3RJbGliOW56U3JRMmlqRWUzQm1qUVZzYzczTWdxMmFKMFN3T0NNWWkK",
       "windows": {
         "installMode": "passive"
       },

@@ -18,23 +18,38 @@ on:
       - main
 
 jobs:
+  prepare:
+    name: Prepare matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Compute build matrix
+        id: set-matrix
+        shell: bash
+        env:
+          TARGET: ${{ github.event.inputs.target }}
+        run: |
+          set -euo pipefail
+          all='[
+            {"id":"macos-intel","runner":"macos-13","rust_target":"x86_64-apple-darwin"},
+            {"id":"macos-arm64","runner":"macos-14","rust_target":"aarch64-apple-darwin"},
+            {"id":"windows-x64","runner":"windows-latest","rust_target":"x86_64-pc-windows-msvc"}
+          ]'
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${TARGET}" && "${TARGET}" != "all" ]]; then
+            matrix=$(echo "$all" | jq -c --arg id "$TARGET" '[.[] | select(.id == $id)]')
+          else
+            matrix=$(echo "$all" | jq -c '.')
+          fi
+          echo "matrix={\"settings\":$matrix}" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build (${{ matrix.settings.id }})
+    needs: prepare
     runs-on: ${{ matrix.settings.runner }}
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.settings.id
     strategy:
       fail-fast: false
-      matrix:
-        settings:
-          - id: macos-intel
-            runner: macos-13
-            rust_target: x86_64-apple-darwin
-          - id: macos-arm64
-            runner: macos-14
-            rust_target: aarch64-apple-darwin
-          - id: windows-x64
-            runner: windows-latest
-            rust_target: x86_64-pc-windows-msvc
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
 
     permissions:
       contents: read

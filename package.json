@@ -21,6 +21,12 @@
   "engines": {
     "pnpm": ">=8.0.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "core-js"
+    ]
+  },
   "dependencies": {
     "@fluentui/react-components": "^9.25.1",
     "@fluentui/react-icons": "^2.0.204",
