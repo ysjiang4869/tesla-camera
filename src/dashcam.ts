@@ -882,6 +882,103 @@ export function formatDashcamText(point: DashcamPoint | undefined): string {
   return chunks.join(' | ')
 }
 
+// ── 与播放器 HUD 一致的精简遥测文本(用于导出烧录到视频底部) ──────────────
+// 只保留 HUD 展示的字段:挡位/速度/方向盘/辅助驾驶/转向灯/刹车/电门,
+// 不再像 formatDashcamText 那样把全部 extra values 一股脑写出来。
+
+function hudToFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim())
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+function hudToBoolean(value: unknown): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') {
+    const lower = value.trim().toLowerCase()
+    if (['1', 'true', 'yes', 'on'].includes(lower)) return true
+    if (['0', 'false', 'no', 'off', 'none'].includes(lower)) return false
+  }
+  return Boolean(value)
+}
+
+function hudGear(gear: DashcamPoint['gear']): string | undefined {
+  if (gear === undefined || gear === null) return undefined
+  const raw = String(gear).trim().toUpperCase()
+  const mapped = Number(raw)
+  if (Number.isFinite(mapped)) {
+    return ({ 0: 'P', 1: 'D', 2: 'R', 3: 'N' } as Record<number, string>)[mapped] ?? raw
+  }
+  return raw || undefined
+}
+
+function hudAutopilot(state: DashcamPoint['autopilotState']): string | undefined {
+  if (state === undefined || state === null || state === '') return undefined
+  const raw = String(state).trim().toUpperCase()
+  const labelMap: Record<string, string> = {
+    NONE: '关闭', SELF_DRIVING: 'FSD', AUTOSTEER: 'Autosteer', TACC: 'TACC',
+    '0': '关闭', '1': 'FSD', '2': 'Autosteer', '3': 'TACC',
+  }
+  return labelMap[raw] ?? String(state)
+}
+
+function hudSignal(point: DashcamPoint): string | undefined {
+  const raw = String(point.turnSignal ?? '').trim().toLowerCase()
+  let left = hudToBoolean(point.blinkerLeft)
+  let right = hudToBoolean(point.blinkerRight)
+  if (raw.includes('双') || raw.includes('hazard') || raw.includes('both') || raw === '3') { left = true; right = true }
+  else if (raw.includes('左') || raw.includes('left') || raw === '1') { left = true; right = false }
+  else if (raw.includes('右') || raw.includes('right') || raw === '2') { left = false; right = true }
+  if (left && right) return '双闪'
+  if (left) return '左'
+  if (right) return '右'
+  return undefined
+}
+
+function hudPercent(value: unknown): number | undefined {
+  const num = hudToFiniteNumber(value)
+  if (num === undefined) return undefined
+  const scaled = num >= 0 && num <= 1 ? num * 100 : num
+  return Math.min(100, Math.max(0, scaled))
+}
+
+export function formatDashcamHudText(point: DashcamPoint | undefined): string {
+  if (!point) {
+    return ''
+  }
+  const chunks: string[] = []
+
+  const gear = hudGear(point.gear)
+  if (gear) chunks.push(`挡位 ${gear}`)
+
+  const speedKmh = hudToFiniteNumber(point.speed)
+    ?? (hudToFiniteNumber(point.speedMps) === undefined ? undefined : (point.speedMps as number) * 3.6)
+  if (speedKmh !== undefined) chunks.push(`速度 ${Math.max(0, Math.round(speedKmh))} km/h`)
+
+  const steering = hudToFiniteNumber(point.steeringAngle)
+  if (steering !== undefined) chunks.push(`方向盘 ${steering >= 0 ? '+' : ''}${steering.toFixed(1)}°`)
+
+  const ap = hudAutopilot(point.autopilotState)
+  if (ap) chunks.push(`辅助驾驶 ${ap}`)
+
+  const signal = hudSignal(point)
+  if (signal) chunks.push(`转向灯 ${signal}`)
+
+  if (point.brakePressed !== undefined) {
+    const brake = hudPercent(point.brakePressed) ?? (hudToBoolean(point.brakePressed) ? 100 : 0)
+    chunks.push(`刹车 ${Math.round(brake)}%`)
+  }
+
+  const accel = hudPercent(point.acceleratorPedal)
+  if (accel !== undefined) chunks.push(`电门 ${Math.round(accel)}%`)
+
+  return chunks.join('  |  ')
+}
+
 export function formatDashcamDebugText(point: DashcamPoint | undefined): string {
   if (!point?.values) {
     return ''
@@ -892,23 +989,29 @@ export function formatDashcamDebugText(point: DashcamPoint | undefined): string 
     .join(' ')
 }
 
-export function buildDashcamSrt(points: DashcamPoint[] | undefined): string {
+// 遥测点是逐帧的(~36fps),若逐点生成字幕,速度/方向盘等值每帧微变会导致文本
+// 不停跳动、底部黑底一直闪烁。这里按固定间隔(默认 1s,与顶部时间粒度一致)降采样,
+// 每格取该时刻生效的点,且相邻字幕首尾相接、无空隙,从而像时间一样顺滑不闪。
+export function buildDashcamSrt(points: DashcamPoint[] | undefined, intervalMs = 1000): string {
   if (!points?.length) {
     return ''
   }
   const lines: string[] = []
   let index = 1
-  for (let i = 0; i < points.length; i++) {
-    const current = points[i]
-    const next = points[i + 1]
-    const start = current.t
-    const end = Math.max(start + 500, (next?.t ?? start + 1000) - 1)
-    const text = formatDashcamText(current)
+  const lastT = points[points.length - 1].t
+  let cursor = 0
+  for (let start = 0; start <= lastT; start += intervalMs) {
+    // 前进到「在 start 时刻生效」的最后一个点(t <= start)
+    while (cursor + 1 < points.length && points[cursor + 1].t <= start) {
+      cursor += 1
+    }
+    const text = formatDashcamHudText(points[cursor])
     if (!text) {
       continue
     }
+    // end 直接等于下一格 start,首尾相接不留空隙(libass 区间为左闭右开,不会重叠)
     lines.push(String(index))
-    lines.push(`${fmtTimestamp(start)} --> ${fmtTimestamp(end)}`)
+    lines.push(`${fmtTimestamp(start)} --> ${fmtTimestamp(start + intervalMs)}`)
     lines.push(text)
     lines.push('')
     index += 1

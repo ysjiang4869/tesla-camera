@@ -103,7 +103,11 @@ const doTask = async (
       if (srt) {
         const srtPath = `${await tempDir()}/tesla-camera-dashcam-${video.time}-${camera}.srt`
         await writeTextFile(srtPath, srt)
-        filters.push(`subtitles='${escapeFfmpegPath(srtPath)}':force_style='FontSize=20,BorderStyle=3,Outline=1'`)
+        // 与顶部时间 drawtext(box=black@0.4)统一风格:白字 + 半透明黑盒、贴底居中。
+        // 注意 ASS BorderStyle=3 的盒子色取自 OutlineColour(非 BackColour),
+        // 故盒色设为 &H99000000(alpha 0x99≈0.4 不透明,等价 black@0.4);
+        // Shadow=0 去阴影,Outline 作为盒内边距让整行信息在底部一行舒展展示。
+        filters.push(`subtitles='${escapeFfmpegPath(srtPath)}':force_style='FontSize=8,PrimaryColour=&H00FFFFFF,OutlineColour=&H99000000,BorderStyle=3,Outline=8,Shadow=0,Alignment=2,MarginV=10'`)
       }
     }
     const command = Command.sidecar(
@@ -148,7 +152,6 @@ const doTask = async (
       })
     })
     command.stderr.on('data', line => {
-      console.warn('[ffmpeg stderr]', line)
       log({
         name: fileName,
         path: filePath,
