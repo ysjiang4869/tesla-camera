@@ -285,7 +285,7 @@ const ClipCard = memo(function ClipCard({ item, active, onSelect, onVisible }: {
             {dayjs(item.time).format('M月D日 H:mm')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-            <span style={sidebarStyles.cardTime}>{dayjs(item.time).format('HH:mm')}</span>
+            <span style={sidebarStyles.cardTime}>{dayjs(item.event ?? item.time).format('HH:mm')}</span>
             {item.event && <span style={sidebarStyles.eventDotInline} />}
           </div>
         </div>
