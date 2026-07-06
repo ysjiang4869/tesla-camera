@@ -91,71 +91,92 @@ const doTask = async (
   }) => void,
 ) => {
   const { path: filePath, name: fileName } = getFile(camera, video)
-  const filters = [
-    `drawtext=fontsize=52:fontcolor=white:box=1:boxborderw=10:x=10:y=10:boxcolor=black@0.4:text='%{pts\\:localtime\\:${video.time / 1000}}'`,
-  ]
-  if (includeDashcam && video.dashcam?.length) {
-    const srt = buildDashcamSrt(video.dashcam)
-    if (srt) {
-      const srtPath = `${await tempDir()}/tesla-camera-dashcam-${video.time}-${camera}.srt`
-      await writeTextFile(srtPath, srt)
-      filters.push(`subtitles='${escapeFfmpegPath(srtPath)}':force_style='FontSize=20,BorderStyle=3,Outline=1'`)
+  try {
+    // 打包的 ffmpeg(tessus 构建)在终端用户机器上找不到 fontconfig 默认配置,
+    // 缺省字体会渲染成「豆腐块」乱码;显式指定随应用打包的字体即可正常写入时间。
+    const fontPath = await resolveResource('fonts/DejaVuSans.ttf')
+    const filters = [
+      `drawtext=fontfile='${escapeFfmpegPath(fontPath)}':fontsize=52:fontcolor=white:box=1:boxborderw=10:x=(w-text_w)/2:y=10:boxcolor=black@0.4:text='%{pts\\:localtime\\:${video.time / 1000}}'`,
+    ]
+    if (includeDashcam && video.dashcam?.length) {
+      const srt = buildDashcamSrt(video.dashcam)
+      if (srt) {
+        const srtPath = `${await tempDir()}/tesla-camera-dashcam-${video.time}-${camera}.srt`
+        await writeTextFile(srtPath, srt)
+        filters.push(`subtitles='${escapeFfmpegPath(srtPath)}':force_style='FontSize=20,BorderStyle=3,Outline=1'`)
+      }
     }
-  }
-  const command = Command.sidecar(
-    'binaries/ffmpeg',
-    [
-      '-y',
-      '-i', filePath,
-      '-progress', '-', '-nostats',
-      '-vf', filters.join(','),
-      `${exportDir}/${fileName}`,
-    ],
-  )
-  command.on('close', () => {
+    const command = Command.sidecar(
+      'binaries/ffmpeg',
+      [
+        '-y',
+        '-i', filePath,
+        '-progress', '-', '-nostats',
+        '-vf', filters.join(','),
+        `${exportDir}/${fileName}`,
+      ],
+    )
+    command.on('close', data => {
+      // 之前无视退出码一律标「成功」;非零退出(如无法写入输出目录)其实是失败
+      const ok = data?.code === 0
+      console.log('[export] ffmpeg closed', data)
+      log({
+        name: fileName,
+        path: filePath,
+        exportDir,
+        status: ok ? ExportStatusEnum.导出成功 : ExportStatusEnum.导出失败,
+        log: ok ? 'success' : `ffmpeg 非零退出 code=${data?.code} signal=${data?.signal}`,
+      })
+    })
+    command.on('error', error => {
+      console.error('[export] ffmpeg error event:', error)
+      log({
+        name: fileName,
+        path: filePath,
+        exportDir,
+        status: ExportStatusEnum.导出失败,
+        log: `进程错误: ${error}`,
+      })
+    })
+    command.stdout.on('data', line => {
+      log({
+        name: fileName,
+        path: filePath,
+        exportDir,
+        status: ExportStatusEnum.进行中,
+        log: line,
+      })
+    })
+    command.stderr.on('data', line => {
+      console.warn('[ffmpeg stderr]', line)
+      log({
+        name: fileName,
+        path: filePath,
+        exportDir,
+        status: ExportStatusEnum.进行中,
+        log: line,
+      })
+    })
+    const child = await command.spawn()
     log({
       name: fileName,
       path: filePath,
       exportDir,
-      status: ExportStatusEnum.导出成功,
-      log: 'success',
+      status: ExportStatusEnum.进行中,
+      log: `pid: ${child.pid}`,
     })
-  })
-  command.on('error', error => {
+  } catch (error) {
+    // sidecar 启动失败(二进制缺失/权限/路径等)不会触发上面的事件回调,
+    // 这里兜底走「导出失败」分支:push 失败任务到列表 + error toast + 通知,避免静默无反应
+    console.error('[export] spawn threw:', error)
     log({
       name: fileName,
       path: filePath,
       exportDir,
       status: ExportStatusEnum.导出失败,
-      log: error,
+      log: `导出启动失败: ${error instanceof Error ? error.message : String(error)}`,
     })
-  })
-  command.stdout.on('data', line => {
-    log({
-      name: fileName,
-      path: filePath,
-      exportDir,
-      status: ExportStatusEnum.进行中,
-      log: line,
-    })
-  })
-  command.stderr.on('data', line => {
-    log({
-      name: fileName,
-      path: filePath,
-      exportDir,
-      status: ExportStatusEnum.进行中,
-      log: line,
-    })
-  })
-  const child = await command.spawn()
-  log({
-    name: fileName,
-    path: filePath,
-    exportDir,
-    status: ExportStatusEnum.进行中,
-    log: `pid: ${child.pid}`,
-  })
+  }
 }
 
 const FfmpegExport: React.FC<FfmpegExportProps> = (props) => {
@@ -289,7 +310,7 @@ const FfmpegExport: React.FC<FfmpegExportProps> = (props) => {
                 提示
               </ToastTitle>
               <ToastBody>
-                {exportDir} 导出失败
+                {name} 导出失败: {log}
               </ToastBody>
             </Toast>,
             { intent: 'error' },
@@ -299,7 +320,7 @@ const FfmpegExport: React.FC<FfmpegExportProps> = (props) => {
             const iconPath = await resolveResource('icons/128x128.png')
             sendNotification({
               title: `${appName}导出通知`,
-              body: `文件导出失败: ${exportDir}`,
+              body: `文件导出失败: ${name}\n${log}`,
               icon: iconPath,
             })
           }
@@ -307,7 +328,19 @@ const FfmpegExport: React.FC<FfmpegExportProps> = (props) => {
         tempTasks.current = temp
         setTasks(temp)
       },
-    )
+    ).catch((error) => {
+      dispatchToast(
+        <Toast>
+          <ToastTitle>
+            提示
+          </ToastTitle>
+          <ToastBody>
+            导出启动失败: {error instanceof Error ? error.message : String(error)}
+          </ToastBody>
+        </Toast>,
+        { intent: 'error' },
+      )
+    })
     dispatchToast(
       <Toast>
         <ToastTitle>

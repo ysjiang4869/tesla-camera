@@ -9,6 +9,7 @@
     "core:default",
     "fs:allow-read-file",
     "fs:allow-write-file",
+    "fs:allow-write-text-file",
     "fs:allow-read-dir",
     "fs:allow-mkdir",
     "fs:allow-remove",
@@ -20,6 +21,17 @@
     },
     {
       "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "args": true,
+          "cmd": "",
+          "name": "binaries/ffmpeg",
+          "sidecar": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
       "allow": [
         {
           "args": true,
