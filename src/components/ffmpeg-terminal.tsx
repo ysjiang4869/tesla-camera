@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import {
-  Tooltip,
   Button,
   Dialog,
   DialogTrigger,
@@ -20,7 +19,8 @@ import {
   ToastTitle,
   Toast,
 } from '@fluentui/react-components'
-import { ClipboardCode24Regular } from '@fluentui/react-icons'
+import { Icons } from './icons'
+import { topbarStyles } from './topbar-styles'
 import { Video } from '../model'
 
 interface FfmpegTerminalProps {
@@ -74,13 +74,11 @@ const FfmpegTerminal: React.FC<FfmpegTerminalProps> = (props) => {
   }
   return props.video ? (
     <Dialog modalType="non-modal">
-      <DialogTrigger>
-        <Tooltip content={<>ffmpeg快捷命令</>} relationship="label">
-          <Button
-            icon={<ClipboardCode24Regular />}
-            size="large"
-          />
-        </Tooltip>
+      <DialogTrigger disableButtonEnhancement>
+        <button style={topbarStyles.btn} title="ffmpeg 快捷命令" type="button">
+          <Icons.Export size={14} />
+          导出片段
+        </button>
       </DialogTrigger>
       <DialogSurface>
         <DialogBody>

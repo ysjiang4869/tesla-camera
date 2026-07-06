@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react'
 import {
-  Tooltip,
   Button,
   Dialog,
   DialogTrigger,
@@ -22,7 +21,8 @@ import {
   tokens,
   Checkbox,
 } from '@fluentui/react-components'
-import { ResizeVideo24Filled } from '@fluentui/react-icons'
+import { Icons } from './icons'
+import { topbarStyles } from './topbar-styles'
 import { type Video, type ExportTaskType, ExportStatusEnum } from '../model'
 import { open } from '@tauri-apps/plugin-dialog'
 import { Command } from '@tauri-apps/plugin-shell'
@@ -334,14 +334,16 @@ const FfmpegExport: React.FC<FfmpegExportProps> = (props) => {
                 }
               }}
             >
-              <DialogTrigger>
-                <Tooltip content={<>导出带有时间码的视频</>} relationship="label">
-                  <Button
-                    icon={<ResizeVideo24Filled />}
-                    size="large"
-                    onClick={() => setDialogIsOpen(true)}
-                  />
-                </Tooltip>
+              <DialogTrigger disableButtonEnhancement>
+                <button
+                  style={topbarStyles.btn}
+                  title="导出带有时间码的视频"
+                  type="button"
+                  onClick={() => setDialogIsOpen(true)}
+                >
+                  <Icons.Export size={14} />
+                  导出片段
+                </button>
               </DialogTrigger>
               <DialogSurface>
                 <DialogBody>

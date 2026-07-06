@@ -8,6 +8,7 @@ import FfmpegExport from './components/ffmpeg-export'
 import FsSystem from './components/fs-system'
 import CheckUpdate from './components/check-update'
 import { Icons } from './components/icons'
+import { topbarStyles } from './components/topbar-styles'
 import {
   TypeEnum,
   type ModelState,
@@ -218,73 +219,6 @@ const TABS = [
   { label: '记录仪', value: TypeEnum.行车记录仪 },
 ]
 
-// ─── TopBar styles ────────────────────────────────────────────────────────────
-
-const topbarStyles = {
-  bar: {
-    height: 52,
-    flexShrink: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 16px',
-    borderBottom: '1px solid var(--line)',
-    background: 'var(--bg-1)',
-    gap: 12,
-  },
-  group: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    height: 34,
-    padding: 3,
-    background: 'var(--bg-0)',
-    border: '1px solid var(--line)',
-    borderRadius: 10,
-    flexShrink: 0,
-  },
-  btn: {
-    height: 28,
-    padding: '0 10px',
-    border: 0,
-    background: 'transparent',
-    color: 'var(--fg-1)',
-    borderRadius: 7,
-    display: 'flex', alignItems: 'center', gap: 6,
-    fontSize: 12,
-    fontWeight: 500,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap' as const,
-    flexShrink: 0,
-    transition: 'background 120ms, color 120ms',
-  },
-  btnActive: {
-    background: 'var(--accent-soft)',
-    color: 'oklch(0.88 0.10 220)',
-    boxShadow: 'inset 0 0 0 1px oklch(0.78 0.13 220 / 0.25)',
-  },
-  iconOnly: {
-    width: 28, height: 28,
-    padding: 0,
-    display: 'grid', placeItems: 'center' as const,
-  },
-  divider: { width: 1, height: 16, background: 'var(--line)', margin: '0 2px', flexShrink: 0 },
-  status: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    fontSize: 11,
-    color: 'var(--fg-2)',
-    fontFamily: "'JetBrains Mono', monospace",
-    whiteSpace: 'nowrap' as const,
-    flexShrink: 0,
-  },
-  statusDot: {
-    width: 6, height: 6, borderRadius: 99,
-    background: 'var(--success)',
-    boxShadow: '0 0 0 3px oklch(0.74 0.16 150 / 0.18)',
-    flexShrink: 0,
-  },
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function revokeGroupUrls(group?: VideoGroup) {
@@ -382,6 +316,7 @@ function App() {
   const [filterType, setFilterType] = useState(TypeEnum.所有)
   const [showDashcamData, setShowDashcamData] = useState(true)
   const [searchText, setSearchText] = useState('')
+  const [openPath, setOpenPath] = useState('')
   const [state, setState] = useState<ModelState>({
     type: TypeEnum.所有,
     list: [],
@@ -523,9 +458,9 @@ function App() {
       {/* ── Sidebar ────────────────────────────────────── */}
       <aside style={sidebarStyles.aside}>
         <div style={sidebarStyles.brand}>
-          <div style={sidebarStyles.brandLogo}>D</div>
+          <div style={sidebarStyles.brandLogo}>T</div>
           <div style={sidebarStyles.brandText}>
-            <span style={sidebarStyles.brandTitle}>Dashcam Viewer</span>
+            <span style={sidebarStyles.brandTitle}>Tesla Camera</span>
             <span style={sidebarStyles.brandSub}>Local · Private</span>
           </div>
         </div>
@@ -579,13 +514,20 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             <div style={topbarStyles.group}>
               {isTauri()
-                ? <FsSystem onAccess={onFileSystemAccess} />
-                : <DirectoryAccess onAccess={onFileSystemAccess} />}
-              <div style={topbarStyles.divider} />
+                ? <FsSystem onAccess={onFileSystemAccess} onPath={setOpenPath} />
+                : <DirectoryAccess onAccess={onFileSystemAccess} onPath={setOpenPath} />}
+              {state.current && <div style={topbarStyles.divider} />}
               {isTauri() && state.current
                 ? <FfmpegExport video={state.current} />
                 : <FfmpegTerminal video={state.current} />}
             </div>
+            {openPath && (
+              <div className="topbar-path" style={topbarStyles.pathPill}>
+                <Icons.Folder size={13} style={{ color: 'var(--fg-2)' }} />
+                <span style={topbarStyles.pathLabel}>路径</span>
+                <span style={topbarStyles.pathValue} title={openPath}>{openPath}</span>
+              </div>
+            )}
             {state.list.length > 0 && (
               <div className="topbar-status" style={topbarStyles.status}>
                 <span style={topbarStyles.statusDot} />

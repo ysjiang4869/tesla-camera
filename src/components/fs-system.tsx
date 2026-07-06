@@ -1,11 +1,7 @@
 import React from 'react'
-import {
-  Tooltip,
-  Body1Strong,
-  Button,
-} from '@fluentui/react-components'
-import { FolderAdd24Regular } from '@fluentui/react-icons'
 import dayjs from 'dayjs'
+import { Icons } from './icons'
+import { topbarStyles } from './topbar-styles'
 import {
   type OriginVideo, type OriginVideoGroup, TypeEnum, type EventJson,
   type FileData, type DashcamPoint,
@@ -42,6 +38,7 @@ interface ThumbnailResult {
 
 interface FsSystemProps {
   onAccess: (accessFile: OriginVideoGroup[]) => void
+  onPath?: (path: string) => void
 }
 
 function toNumber(value?: string): number | undefined {
@@ -170,6 +167,7 @@ const FsSystem: React.FC<FsSystemProps> = props => {
     if (!teslaCamDir) {
       return
     }
+    props.onPath?.(teslaCamDir)
     const scanGroups = await invoke<ScanGroup[]>('scan_teslacam', { dir: teslaCamDir })
     if (loadTokenRef.current !== loadToken) {
       return
@@ -177,16 +175,15 @@ const FsSystem: React.FC<FsSystemProps> = props => {
     props.onAccess(convertScanGroups(scanGroups))
   }
   return (
-    <Tooltip
-      content={<>选择车载U盘中的<Body1Strong>TeslaCam</Body1Strong>目录，或者是<Body1Strong>TeslaCam</Body1Strong>文件目录的拷贝</>}
-      relationship="label"
+    <button
+      style={{ ...topbarStyles.btn, ...topbarStyles.btnActive }}
+      title="选择车载U盘中的 TeslaCam 目录，或者是 TeslaCam 文件目录的拷贝"
+      type="button"
+      onClick={() => onSelectFile()}
     >
-      <Button
-        icon={<FolderAdd24Regular />}
-        size="large"
-        onClick={() => onSelectFile()}
-      />
-    </Tooltip>
+      <Icons.Folder size={14} />
+      选择目录
+    </button>
   )
 }
 

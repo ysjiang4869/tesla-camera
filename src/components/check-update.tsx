@@ -1,9 +1,6 @@
 import React from 'react'
-import {
-  Button,
-  Tooltip,
-} from '@fluentui/react-components'
-import { ApprovalsApp24Regular } from '@fluentui/react-icons'
+import { Icons } from './icons'
+import { topbarStyles } from './topbar-styles'
 import pkgJson from '../../package.json'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
@@ -34,12 +31,14 @@ const CheckUpdate: React.FC = () => {
     }
   }
   return (
-    <Tooltip content={`当前版本 v${pkgJson.version}，检查更新 `} relationship="label">
-      <Button
-        icon={<ApprovalsApp24Regular />}
-        onClick={() => onCheck()}
-      />
-    </Tooltip>
+    <button
+      style={{ ...topbarStyles.btn, ...topbarStyles.iconOnly }}
+      title={`当前版本 v${pkgJson.version}，检查更新`}
+      type="button"
+      onClick={() => onCheck()}
+    >
+      <Icons.Sync size={14} />
+    </button>
   )
 }
 

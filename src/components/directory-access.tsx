@@ -1,11 +1,7 @@
 import React from 'react'
-import {
-  Tooltip,
-  Body1Strong,
-  Button,
-} from '@fluentui/react-components'
-import { FolderAdd24Regular } from '@fluentui/react-icons'
 import dayjs from 'dayjs'
+import { Icons } from './icons'
+import { topbarStyles } from './topbar-styles'
 import {
   type OriginVideo, type OriginVideoGroup, TypeEnum, type VideoFile, type EventJson, type FileData,
 } from '../model'
@@ -16,6 +12,7 @@ import { DEFAULT_THUMBNAIL, getCachedVideoThumbnail } from '../thumbnail'
 
 interface DirectoryAccessProps {
   onAccess: (accessFile: OriginVideoGroup[]) => void
+  onPath?: (path: string) => void
 }
 
 async function getDirFiles(fs: FileSystemDirectoryHandle, path = '') {
@@ -198,6 +195,7 @@ const DirectoryAccess: React.FC<React.PropsWithChildren<DirectoryAccessProps>> =
     const loadToken = loadTokenRef.current + 1
     loadTokenRef.current = loadToken
     const dirHandle = await window.showDirectoryPicker()
+    props.onPath?.(dirHandle.name)
     const files = await getDirFiles(dirHandle)
     const videos = convertFiles(files)
     const videoByPrefix = videos.reduce<Record<string, OriginVideo>>((prev, item) => {
@@ -241,9 +239,15 @@ const DirectoryAccess: React.FC<React.PropsWithChildren<DirectoryAccessProps>> =
     props.onAccess(groups)
   }
   return (
-    <Tooltip content={<>选择车载U盘中的<Body1Strong>TeslaCam</Body1Strong>目录，或者是<Body1Strong>TeslaCam</Body1Strong>文件目录的拷贝</>} relationship="label">
-      <Button icon={<FolderAdd24Regular />} size="large" onClick={() => onSelectFile()} />
-    </Tooltip>
+    <button
+      style={{ ...topbarStyles.btn, ...topbarStyles.btnActive }}
+      title="选择车载U盘中的 TeslaCam 目录，或者是 TeslaCam 文件目录的拷贝"
+      type="button"
+      onClick={() => onSelectFile()}
+    >
+      <Icons.Folder size={14} />
+      选择目录
+    </button>
   )
 }
 
