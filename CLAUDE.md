@@ -10,10 +10,20 @@ Tesla Camera is a cross-platform Tesla dashcam video player built with React, Ty
 - **Web:** Uses File System Access API, generates FFmpeg commands for manual export
 - **Desktop:** Uses Tauri for native file access and direct FFmpeg integration
 
+## 项目结构（Project Structure）
+
+- `src/`：React + TypeScript 前端。
+- `src/components/`：UI 与功能组件（播放器、导出、更新检测、文件系统访问等）。
+- `src/main.tsx` 与 `src/app.tsx`：应用入口与组合根组件。
+- `src-tauri/`：Rust/Tauri 桌面端封装（`src-tauri/src/main.rs`、`tauri.conf.json`、`binaries/`）。
+- `public/`：静态 Web 资源。
+- `scripts/`：维护脚本（例如 `scripts/bump-version.js`）。
+- `.github/workflows/`：CI / 发布流水线。
+
 ## Development Commands
 
 ### Prerequisites
-- **pnpm >=8.0.0** (enforced)
+- **pnpm >=8.0.0** (enforced)，先执行 `pnpm install` 安装 JS 依赖
 - **Rust toolchain** (for Tauri desktop builds)
 - Run `./init-binaries.sh` to download FFmpeg binaries for video export
 
@@ -33,7 +43,7 @@ pnpm build:tauri      # Build web bundle for Tauri
 
 ### Code Quality
 ```bash
-pnpm lint             # Lint code (ESLint)
+pnpm lint             # Lint code (ESLint)，校验 src/**/*.ts(x)，不允许任何 warning
 ```
 
 ### Version Management
@@ -122,6 +132,13 @@ App (main container, state management)
 
 ## Code Patterns
 
+### 编码风格与命名约定
+- 语言组合：TypeScript/TSX（前端）与 Rust（Tauri 宿主）。
+- 遵循 `.eslintrc.cjs` 中的 ESLint 配置（`@mario34/eslint-config-react`）。
+- 使用 2 空格缩进，沿用 `src/` 中现有的 import 与代码风格。
+- 组件文件采用 kebab-case 命名（例如 `mini-player.tsx`）。
+- React 组件保持函数式、职责单一；功能 UI 统一放在 `src/components/` 下。
+
 ### Styling
 - `makeStyles` from Fluent UI (CSS-in-JS)
 - Responsive design with media queries
@@ -144,3 +161,24 @@ App (main container, state management)
 - ESLint for code quality
 - Manual testing via dev mode
 - Husky pre-commit hooks for linting
+
+**提交 PR 前的最低门槛：** `pnpm lint`、`pnpm build`，以及通过 `pnpm dev` 或 `pnpm app:dev` 做人工验证。
+
+**如果新增测试：** 将 `*.test.ts` / `*.test.tsx` 放在源码旁，或新建 `tests/` 目录，并补充 `pnpm test` 脚本。
+
+## 提交与 PR 规范（Commit & Pull Request）
+
+- 提交信息必须符合 Commitlint 的 Angular 规范（见 `commitlint.config.js`），例如 `feat: add directory picker`、`fix: handle ffmpeg permission`。
+- Husky 钩子保障质量：
+  - `pre-commit`：`lint-staged`（对暂存的 `*.js,*.ts,*.tsx` 执行 `eslint --fix`）。
+  - `commit-msg`：commitlint 校验。
+- PR 应包含：
+  - 清晰的摘要与改动范围；
+  - 关联的 issue（如有）；
+  - UI 改动的截图 / 录屏；
+  - 已测试的平台（Web、macOS、Windows，视相关性而定）。
+
+## 安全与配置建议（Security & Configuration）
+
+- 不要将密钥提交到源码中；本地使用 `.env` / `.env.tauri`。
+- 不要提交 Tauri 发布流水线所用的私有签名密钥。
