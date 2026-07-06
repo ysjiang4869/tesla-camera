@@ -324,20 +324,20 @@ const S = {
     pointerEvents: 'none' as const,
   },
 
-  // HUD
+  // HUD — 紧凑玻璃拟态，高透明度以尽量避免遮挡画面
   hud: {
     position: 'absolute' as const,
-    bottom: 24,
+    bottom: 18,
     left: '50%',
     transform: 'translateX(-50%)',
-    width: 'min(480px, 68%)',
-    background: 'oklch(0.16 0.005 250 / 0.65)',
-    backdropFilter: 'blur(18px) saturate(160%)',
-    border: '1px solid oklch(1 0 0 / 0.08)',
-    borderRadius: 16,
-    padding: '12px 14px',
+    width: 'clamp(272px, 46%, 336px)',
+    background: 'oklch(0.14 0.005 250 / 0.26)',
+    backdropFilter: 'blur(10px) saturate(140%)',
+    border: '1px solid oklch(1 0 0 / 0.06)',
+    borderRadius: 14,
+    padding: '9px 14px 10px',
     color: 'var(--fg-0)',
-    boxShadow: '0 12px 40px -12px oklch(0 0 0 / 0.7)',
+    boxShadow: '0 8px 30px -14px oklch(0 0 0 / 0.6)',
     pointerEvents: 'none' as const,
     zIndex: 4,
   },
@@ -346,55 +346,90 @@ const S = {
     gridTemplateColumns: 'auto 1fr auto',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 8,
+    marginBottom: 6,
+    padding: '0 14px',
   },
   gearBadge: {
-    width: 36, height: 36,
-    borderRadius: 9,
+    width: 30, height: 30,
+    borderRadius: 8,
     border: '1px solid oklch(1 0 0 / 0.18)',
     display: 'grid', placeItems: 'center' as const,
     fontFamily: "'JetBrains Mono', monospace",
     fontWeight: 700,
-    fontSize: 17,
+    fontSize: 15,
     color: 'var(--fg-0)',
     background: 'oklch(1 0 0 / 0.04)',
   },
   apWrap: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 2 },
   apLabel: {
-    fontSize: 9,
+    fontSize: 9.5,
     color: 'var(--fg-2)',
     letterSpacing: '1.5px',
     textTransform: 'uppercase' as const,
     fontWeight: 500,
   },
-  apState: { fontSize: 12, fontWeight: 600, color: 'oklch(0.85 0.10 220)', letterSpacing: '0.3px' },
+  apState: { fontSize: 12.5, fontWeight: 600, color: 'oklch(0.85 0.10 220)', letterSpacing: '0.3px' },
   steeringWrap: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 2 },
   steeringText: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: "'JetBrains Mono', monospace",
     color: 'var(--fg-1)',
     fontVariantNumeric: 'tabular-nums' as const,
   },
-  speedRow: {
+
+  // 主行：刹车（竖条） | 速度 | 电门（竖条）
+  mainRow: {
     display: 'grid',
-    gridTemplateColumns: '1fr auto 1fr',
+    gridTemplateColumns: 'auto 1fr auto',
     alignItems: 'center',
     gap: 10,
-    margin: '2px 0 10px',
+    padding: '0 18px',
+  },
+  vPedal: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 4 },
+  vPedalTrack: {
+    width: 24,
+    height: 56,
+    borderRadius: 6,
+    background: 'oklch(1 0 0 / 0.08)',
+    border: '1px solid oklch(1 0 0 / 0.09)',
+    overflow: 'hidden' as const,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    justifyContent: 'flex-end',
+  },
+  vPedalFill: {
+    width: '100%',
+    height: '0%',
+    borderRadius: 5,
+    transition: 'height 200ms',
+  },
+  vPedalLabel: { fontSize: 9, color: 'var(--fg-2)', letterSpacing: '0.5px', fontWeight: 600 },
+  vPedalValue: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10.5,
+    fontWeight: 700,
+    fontVariantNumeric: 'tabular-nums' as const,
+  },
+  speedRow: {
+    display: 'grid',
+    gridTemplateColumns: 'auto auto auto',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
   },
   turnArrow: {
     display: 'grid', placeItems: 'center' as const,
-    color: 'oklch(0.45 0.03 250)',
+    color: 'oklch(0.55 0.04 250)',
     transition: 'color 120ms',
   },
   turnActive: { color: 'oklch(0.85 0.16 80)' },
-  speedBlock: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center' },
+  speedBlock: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', minWidth: 92 },
   speedValue: {
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 48,
+    fontSize: 40,
     fontWeight: 700,
     lineHeight: 1,
-    letterSpacing: '-2px',
+    letterSpacing: '-1.5px',
     fontVariantNumeric: 'tabular-nums' as const,
     color: 'var(--fg-0)',
   },
@@ -402,44 +437,8 @@ const S = {
     fontSize: 10,
     color: 'var(--fg-2)',
     letterSpacing: '2px',
-    marginTop: 3,
+    marginTop: 4,
     fontWeight: 600,
-  },
-  pedalRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
-  pedal: {
-    position: 'relative' as const,
-    height: 34,
-    borderRadius: 7,
-    background: 'oklch(1 0 0 / 0.05)',
-    border: '1px solid oklch(1 0 0 / 0.10)',
-    overflow: 'hidden' as const,
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0 10px',
-    justifyContent: 'space-between',
-  },
-  pedalFill: {
-    position: 'absolute' as const, inset: 0,
-    width: '0%',
-    transition: 'width 200ms',
-    pointerEvents: 'none' as const,
-  },
-  pedalLabel: {
-    position: 'relative' as const,
-    fontSize: 9.5,
-    color: 'var(--fg-2)',
-    letterSpacing: '1.5px',
-    textTransform: 'uppercase' as const,
-    fontWeight: 600,
-    zIndex: 1,
-  },
-  pedalValue: {
-    position: 'relative' as const,
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 12.5,
-    fontWeight: 700,
-    fontVariantNumeric: 'tabular-nums' as const,
-    zIndex: 1,
   },
 
   // Timeline
@@ -1080,33 +1079,39 @@ const Player: React.FC<PlayerProps> = (props) => {
           <img
             alt="steering"
             src={STEERING_WHEEL_ICON}
-            style={{ width: 28, height: 28, display: 'block', transformOrigin: '50% 50%', transform: `rotate(${steeringRotate}deg)`, transition: 'transform 200ms' }}
+            style={{ width: 22, height: 22, display: 'block', transformOrigin: '50% 50%', transform: `rotate(${steeringRotate}deg)`, transition: 'transform 200ms' }}
           />
           <span style={S.steeringText}>{steeringText}</span>
         </div>
       </div>
-      <div style={S.speedRow}>
-        <div style={{ ...S.turnArrow, ...(signalState.left ? S.turnActive : {}) }}>
-          <Icons.ArrowLeft size={24} stroke={2} />
+      <div style={S.mainRow}>
+        {/* 刹车 — 竖向 */}
+        <div style={S.vPedal}>
+          <span style={{ ...S.vPedalValue, color: 'oklch(0.72 0.19 25)' }}>{Math.round(brakePercent)}%</span>
+          <div style={S.vPedalTrack}>
+            <div style={{ ...S.vPedalFill, height: `${brakePercent}%`, background: 'oklch(0.60 0.20 25 / 0.85)' }} />
+          </div>
+          <span style={S.vPedalLabel}>刹车</span>
         </div>
-        <div style={S.speedBlock}>
-          <span style={S.speedValue}>{speedText}</span>
-          <span style={S.speedUnit}>KM/H</span>
+        <div style={S.speedRow}>
+          <div style={{ ...S.turnArrow, ...(signalState.left ? S.turnActive : {}) }}>
+            <Icons.ArrowLeft size={22} stroke={2} />
+          </div>
+          <div style={S.speedBlock}>
+            <span style={S.speedValue}>{speedText}</span>
+            <span style={S.speedUnit}>KM/H</span>
+          </div>
+          <div style={{ ...S.turnArrow, ...(signalState.right ? S.turnActive : {}) }}>
+            <Icons.ArrowRight size={22} stroke={2} />
+          </div>
         </div>
-        <div style={{ ...S.turnArrow, ...(signalState.right ? S.turnActive : {}) }}>
-          <Icons.ArrowRight size={24} stroke={2} />
-        </div>
-      </div>
-      <div style={S.pedalRow}>
-        <div style={S.pedal}>
-          <div style={{ ...S.pedalFill, width: `${brakePercent}%`, background: 'oklch(0.55 0.20 25 / 0.55)' }} />
-          <span style={S.pedalLabel}>刹车</span>
-          <span style={S.pedalValue}>{Math.round(brakePercent)}%</span>
-        </div>
-        <div style={S.pedal}>
-          <div style={{ ...S.pedalFill, width: `${acceleratorValue}%`, background: 'oklch(0.55 0.16 150 / 0.55)' }} />
-          <span style={S.pedalLabel}>电门</span>
-          <span style={S.pedalValue}>{acceleratorText}</span>
+        {/* 电门 — 竖向 */}
+        <div style={S.vPedal}>
+          <span style={{ ...S.vPedalValue, color: 'oklch(0.74 0.16 150)' }}>{acceleratorText}</span>
+          <div style={S.vPedalTrack}>
+            <div style={{ ...S.vPedalFill, height: `${acceleratorValue}%`, background: 'oklch(0.62 0.16 150 / 0.85)' }} />
+          </div>
+          <span style={S.vPedalLabel}>电门</span>
         </div>
       </div>
       {showDashcamDebug && dashcamDebugText && (
