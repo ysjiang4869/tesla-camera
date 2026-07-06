@@ -1,3 +1,18 @@
+# [2.1.0](https://github.com/ysjiang4869/tesla-camera/compare/v2.0.2...v2.1.0) (2026-07-06)
+
+
+### Bug Fixes
+
+* export problem ([cbee966](https://github.com/ysjiang4869/tesla-camera/commit/cbee96668c634077111413403d01abea77c55114))
+
+
+### Features
+
+* 还原ui不相似的地方；增加路径展示 ([3a9305f](https://github.com/ysjiang4869/tesla-camera/commit/3a9305f0d007e484b84dc6b51f53578c3f2c3da3))
+* export with dash cam ([388dc4f](https://github.com/ysjiang4869/tesla-camera/commit/388dc4f0cf3af8bd5e659ab8aa74314938734ffe))
+
+
+
 ## [2.0.2](https://github.com/ysjiang4869/tesla-camera/compare/v2.0.1...v2.0.2) (2026-07-06)
 
 
