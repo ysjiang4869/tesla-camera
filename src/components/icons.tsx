@@ -50,6 +50,7 @@ export const Icons = {
   ArrowLeft: (p: IconProps) => <Ico {...p}><path d="M19 12H5" /><path d="m12 5-7 7 7 7" /></Ico>,
   ArrowRight: (p: IconProps) => <Ico {...p}><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></Ico>,
   Battery: (p: IconProps) => <Ico {...p}><rect height="10" rx="2" width="18" x="2" y="7" /><path d="M22 11v2" /></Ico>,
+  Tasks: (p: IconProps) => <Ico {...p}><rect height="18" rx="2.5" width="18" x="3" y="3" /><path d="m7.5 12 2.5 2.5L16.5 8" /></Ico>,
 }
 
 export default Icons

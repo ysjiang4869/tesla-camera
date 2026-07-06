@@ -14,7 +14,9 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
-import { TaskListSquareLtr24Regular, VideoClipMultiple24Regular } from '@fluentui/react-icons'
+import { VideoClipMultiple24Regular } from '@fluentui/react-icons'
+import { Icons } from './icons'
+import { topbarStyles } from './topbar-styles'
 import { type ExportTaskType, ExportStatusEnum } from '../model'
 
 interface ExportTaskProps {
@@ -75,12 +77,14 @@ const ExportTask: React.FC<ExportTaskProps> = (props) => {
   return (
     <>
       <Dialog modalType="modal">
-        <DialogTrigger>
-          <div className={styles.badgeBox}>
-            <Button
-              icon={<TaskListSquareLtr24Regular />}
-              size="large"
-            />
+        <DialogTrigger disableButtonEnhancement>
+          <button
+            className={styles.badgeBox}
+            style={{ ...topbarStyles.btn, ...topbarStyles.iconOnly }}
+            title="任务列表"
+            type="button"
+          >
+            <Icons.Tasks size={14} />
             {
               inProgressTask.length > 0 ? (
                 <Badge
@@ -92,7 +96,7 @@ const ExportTask: React.FC<ExportTaskProps> = (props) => {
                 </Badge>
               ) : null
             }
-          </div>
+          </button>
         </DialogTrigger>
         <DialogSurface>
           <DialogBody>

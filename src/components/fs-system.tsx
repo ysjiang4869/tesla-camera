@@ -182,7 +182,7 @@ const FsSystem: React.FC<FsSystemProps> = props => {
       onClick={() => onSelectFile()}
     >
       <Icons.Folder size={14} />
-      选择目录
+      {/* 选择目录 */}
     </button>
   )
 }

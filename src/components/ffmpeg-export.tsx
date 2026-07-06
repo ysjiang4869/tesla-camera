@@ -378,7 +378,7 @@ const FfmpegExport: React.FC<FfmpegExportProps> = (props) => {
                   onClick={() => setDialogIsOpen(true)}
                 >
                   <Icons.Export size={14} />
-                  导出片段
+                  {/* 导出片段 */}
                 </button>
               </DialogTrigger>
               <DialogSurface>

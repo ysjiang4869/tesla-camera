@@ -246,7 +246,7 @@ const DirectoryAccess: React.FC<React.PropsWithChildren<DirectoryAccessProps>> =
       onClick={() => onSelectFile()}
     >
       <Icons.Folder size={14} />
-      选择目录
+      {/* 选择目录 */}
     </button>
   )
 }
