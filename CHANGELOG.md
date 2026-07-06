@@ -1,3 +1,12 @@
+## [2.0.2](https://github.com/ysjiang4869/tesla-camera/compare/v2.0.1...v2.0.2) (2026-07-06)
+
+
+### Features
+
+* improve ui size ([7808605](https://github.com/ysjiang4869/tesla-camera/commit/7808605ad9c30bb6ef96ba332d35f9cdd2037777))
+
+
+
 ## [2.0.1](https://github.com/ysjiang4869/tesla-camera/compare/v2.0.0...v2.0.1) (2026-07-05)
 
 
