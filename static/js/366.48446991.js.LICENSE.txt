@@ -15,8 +15,6 @@
 
 /*! ./middleware */
 
-/*! ./helpers/tauri.js */
-
 /*! ./constants */
 
 /*! react */
@@ -87,6 +85,8 @@
 
 /*! ../utils/getNativeElementProps */
 
+/*! ./core.js */
+
 /*! @fluentui/react-jsx-runtime/jsx-runtime */
 
 /*! react */
@@ -100,8 +100,6 @@
 /*! @fluentui/react-jsx-runtime/jsx-runtime */
 
 /*! ./__styles.esm.js */
-
-/*! ./Enum.js */
 
 /*! ./useButtonBase */
 
@@ -143,8 +141,6 @@
 
 /*! @fluentui/react-shared-contexts */
 
-/*! ./Tokenizer.js */
-
 /*! react */
 
 /*! @fluentui/react-utilities */
@@ -159,8 +155,6 @@
 
 /*! @fluentui/react-shared-contexts */
 
-/*! ./Utility.js */
-
 /*! @fluentui/react-utilities */
 
 /*! ./renderCheckbox */
@@ -170,8 +164,6 @@
 /*! @fluentui/react-shared-contexts */
 
 /*! ./factories/createPresenceComponent */
-
-/*! ./helpers/event.js */
 
 /*! @fluentui/react-label */
 
@@ -196,6 +188,8 @@
 /*! ./convert-9768a965.js */
 
 /*! @fluentui/react-tabster */
+
+/*! ./Utility.js */
 
 /*! ./insertionFactory.esm.js */
 
@@ -367,6 +361,8 @@
 
 /*! @fluentui/react-motion */
 
+/*! @tauri-apps/api/path */
+
 /*! ./getBoundary */
 
 /*! ./DialogActions */
@@ -422,13 +418,13 @@
 
 /*! ./isResolvedShorthand */
 
-/*! ./fs.js */
-
 /*! ./FieldContext */
 
 /*! ./useToastBodyStyles.styles */
 
 /*! @fluentui/react-checkbox */
+
+/*! ./external/tslib/tslib.es6.js */
 
 /*! ./constants */
 
@@ -458,8 +454,6 @@
  */
 
 /*! @fluentui/react-theme */
-
-/*! ../tauri.js */
 
 /*! @fluentui/react-dialog */
 
@@ -504,8 +498,6 @@
 
 /*! ../../contexts/index */
 
-/*! ./Enum.js */
-
 /*!
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Licensed under the MIT License.
@@ -544,21 +536,19 @@
 
 /*! @fluentui/react-theme */
 
+/*! @tauri-apps/api/core */
+
 /*! react */
 
 /*! ./generateStyles.esm.js */
 
 /*! ./useDialogSurface */
 
-/*! ./helpers/tauri.js */
-
 /*! @fluentui/react-utilities */
 
 /*! @fluentui/react-tabster */
 
 /*! ./contexts/MotionBehaviourContext */
-
-/*! ./Utility.js */
 
 /*! ./isAtRuleElement.esm.js */
 
@@ -584,13 +574,13 @@
 
 /*! ../utils/createFluentIcon */
 
-/*! ./Serializer.js */
-
 /*! @fluentui/react-utilities */
 
 /*! react */
 
 /*! @griffel/react */
+
+/*! ./Tokenizer.js */
 
 /*! ./contexts/index */
 
@@ -782,8 +772,6 @@
 
 /*! ./ProviderContext */
 
-/*! ./src/Utility.js */
-
 /*! ./useDialogContent */
 
 /*! ./useFluentProviderThemeStyleTag */
@@ -792,15 +780,11 @@
 
 /*! ./icons/chunk-28 */
 
-/*! ./Enum.js */
-
 /*! ./vanilla */
 
 /*! ./sizedIcons/chunk-27 */
 
 /*! ./useToasterStyles.styles */
-
-/*! ./helpers/os-check.js */
 
 /*! ./private/constants */
 
@@ -832,8 +816,6 @@
 
 /*! ./renderTooltip */
 
-/*! ./Utility.js */
-
 /*! react */
 
 /*! @fluentui/react-shared-contexts */
@@ -843,6 +825,8 @@
 /*! ./components/Dialog/index */
 
 /*! react */
+
+/*! ./core.js */
 
 /*! ./renderInput */
 
@@ -915,6 +899,8 @@
 
 /*! ./renderToaster */
 
+/*! ./Enum.js */
+
 /*! @fluentui/react-utilities */
 
 /*! react */
@@ -924,8 +910,6 @@
 /*! @floating-ui/dom */
 
 /*! @fluentui/react-shared-contexts */
-
-/*! ./helpers/tauri.js */
 
 /*! ../utils/createFluentIcon */
 
@@ -947,7 +931,13 @@
 
 /*! ../../state */
 
+/*! ./Tokenizer.js */
+
 /*! @griffel/react */
+
+/*! ./Utility.js */
+
+/*! ./image.js */
 
 /*! ./useText */
 
@@ -1030,8 +1020,6 @@
 
 /*! ./useFocusVisible */
 
-/*! ./src/Enum.js */
-
 /*! ../utils/getMetadataFromSlotComponent */
 
 /*! ./teams/index.js */
@@ -1091,8 +1079,6 @@
 /*! @fluentui/react-utilities */
 
 /*! @fluentui/react-motion */
-
-/*! ./src/Serializer.js */
 
 /*! ./useDialogTitle */
 
@@ -1190,9 +1176,9 @@
 
 /*! ../Text */
 
-/*! ./src/Middleware.js */
-
 /*! @fluentui/react-shared-contexts */
+
+/*! @tauri-apps/api/core */
 
 /*! @fluentui/react-utilities */
 
@@ -1224,8 +1210,6 @@
 /*! @fluentui/react-context-selector */
 
 /*! ./useDialog */
-
-/*! ./tauri.js */
 
 /*! ./shorthands.esm.js */
 
@@ -1275,6 +1259,8 @@
 
 /*! ../../contexts/toastContainerContext */
 
+/*! @tauri-apps/api/core */
+
 /*! @fluentui/react-utilities */
 
 /*! react */
@@ -1302,15 +1288,13 @@
 
 /*! react */
 
+/*! ./Enum.js */
+
 /*! react */
 
 /*! @fluentui/react-utilities */
 
-/*! ./src/Parser.js */
-
 /*! ./themes/index.js */
-
-/*! ./helpers/tauri.js */
 
 /*! ./createToaster */
 
@@ -1350,6 +1334,8 @@
 
 /*! @fluentui/react-field */
 
+/*! ./Utility.js */
+
 /*! react */
 
 /*! ./utils */
@@ -1381,6 +1367,8 @@
 /*! @fluentui/react-jsx-runtime/jsx-runtime */
 
 /*! ./Checkbox */
+
+/*! ./Serializer.js */
 
 /*! ./darkTheme.js */
 
@@ -1419,8 +1407,6 @@
 /*! ./renderer/createDOMRenderer.esm.js */
 
 /*! ./generateStyles.esm.js */
-
-/*! ./src/Tokenizer.js */
 
 /*! ./useBadge */
 
@@ -1487,6 +1473,8 @@
 /*! ./useTabsterAttributes */
 
 /*! react */
+
+/*! @tauri-apps/api/core */
 
 /*! ./utils/normalizeNestedProperty.esm.js */
 
@@ -1586,8 +1574,6 @@
 
 /*! ./__styles.esm.js */
 
-/*! ./helpers/tauri.js */
-
 /*! ./renderDialogSurface */
 
 /*! @griffel/core */
@@ -1595,6 +1581,8 @@
 /*! @fluentui/react-jsx-runtime/jsx-runtime */
 
 /*! ./useDialogTrigger */
+
+/*! ./src/Utility.js */
 
 /*! react */
 
@@ -1622,6 +1610,8 @@
 /*! ../constants.esm.js */
 
 /*! ./runtime/utils/hashSequence.esm.js */
+
+/*! ./Enum.js */
 
 /*! @fluentui/react-motion */
 
@@ -1653,6 +1643,8 @@
 /*! @fluentui/react-jsx-runtime/jsx-runtime */
 
 /*! react */
+
+/*! ./Utility.js */
 
 /*! react */
 
@@ -1702,8 +1694,6 @@
 /*! ./borderStyle.esm.js */
 
 /*! ../../global/brandColors.js */
-
-/*! ./helpers/tauri.js */
 
 /*! @fluentui/react-button */
 
@@ -1835,8 +1825,6 @@
 
 /*! @fluentui/react-utilities */
 
-/*! ./Utility.js */
-
 /*! ./useDialogTitleStyles.styles */
 
 /*! react */
@@ -1874,6 +1862,8 @@
 /*! ./ToastContainer */
 
 /*! ./shorthands/overflow.esm.js */
+
+/*! ./src/Enum.js */
 
 /*! react */
 
@@ -1918,6 +1908,8 @@
 
 /*! @fluentui/react-jsx-runtime/jsx-runtime */
 
+/*! ./core.js */
+
 /*! @fluentui/react-jsx-runtime/jsx-runtime */
 
 /*! ./getStyleBucketName.esm.js */
@@ -1949,6 +1941,8 @@
 /*! react */
 
 /*! ./clampValue */
+
+/*! ./src/Serializer.js */
 
 /*! ../../utils/index */
 
@@ -2063,6 +2057,8 @@
 
 /*! ../statusColorMapping.js */
 
+/*! ./src/Middleware.js */
+
 /*! @fluentui/react-shared-contexts */
 
 /*! ./dismissAllToasts */
@@ -2119,8 +2115,6 @@
 
 /*! ./useLabelStyles.styles */
 
-/*! ./event.js */
-
 /*! react */
 
 /*! ./renderToaster */
@@ -2158,6 +2152,8 @@
 /*! ../MotionRefForwarder */
 
 /*! ./useDisableBodyScroll.styles */
+
+/*! ./src/Parser.js */
 
 /*! ./useInput */
 
@@ -2235,8 +2231,6 @@
 
 /*! ./useFluentProviderStyles.styles */
 
-/*! ./tauri.js */
-
 /*! ./useCallbackRef */
 
 /*! @fluentui/react-utilities */
@@ -2253,8 +2247,6 @@
 
 /*! ./TextDirectionContext.esm.js */
 
-/*! ./Tokenizer.js */
-
 /*!
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Licensed under the MIT License.
@@ -2269,6 +2261,8 @@
 /*! @emotion/hash */
 
 /*! ./PortalMountNodeContext */
+
+/*! ./src/Tokenizer.js */
 
 /*! @floating-ui/dom */
 
@@ -2319,8 +2313,6 @@
 /*! ./createFluentIcon.styles */
 
 /*! @fluentui/react-jsx-runtime/jsx-runtime */
-
-/*! ../tauri.js */
 
 /*! ../../contexts */
 
@@ -2450,6 +2442,8 @@
 
 /*! ./matchTargetSize */
 
+/*! @tauri-apps/api/core */
+
 /*! ../../utils */
 
 /*! react */
@@ -2537,6 +2531,8 @@
 /*! ./useTabster */
 
 /*! ../utils/createFluentIcon */
+
+/*! @tauri-apps/api/core */
 
 /*! ./shorthands/borderLeft.esm.js */
 
