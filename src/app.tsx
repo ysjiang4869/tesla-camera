@@ -124,7 +124,11 @@ const sidebarStyles = {
     gap: 10,
     padding: 8,
     borderRadius: 10,
-    border: '1px solid transparent',
+    // 用 longhand 而非 border shorthand：cardActive 只改 borderColor(longhand)。
+    // 混用会导致取消选中时 React 删除 borderColor，边框回落到 currentColor → WKWebView 残留白框
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'transparent',
     background: 'transparent',
     color: 'var(--fg-1)',
     cursor: 'pointer',

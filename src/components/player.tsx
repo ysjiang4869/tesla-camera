@@ -220,7 +220,11 @@ const S = {
     flex: '1 1 0',
     minHeight: 0,
     background: 'var(--bg-2)',
-    border: '1px solid var(--line)',
+    // longhand 而非 border shorthand：camTileActive 只改 borderColor，混用会导致
+    // 取消选中时 React 删除 borderColor，边框回落到 currentColor → 残留白框
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'var(--line)',
     borderRadius: 10,
     overflow: 'hidden' as const,
     cursor: 'pointer',
