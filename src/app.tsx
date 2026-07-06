@@ -555,7 +555,7 @@ function App() {
                 style={{ ...topbarStyles.btn, ...topbarStyles.iconOnly }}
                 title="查看源代码"
                 type="button"
-                onClick={() => window.open('https://github.com/Mario34/tesla-camera', '_blank')}
+                onClick={() => window.open('https://github.com/ysjiang4869/tesla-camera', '_blank')}
               >
                 <Icons.Code size={14} />
               </button>
@@ -563,7 +563,7 @@ function App() {
                 style={{ ...topbarStyles.btn, ...topbarStyles.iconOnly }}
                 title="问题反馈"
                 type="button"
-                onClick={() => window.open('https://github.com/Mario34/tesla-camera/issues', '_blank')}
+                onClick={() => window.open('https://github.com/ysjiang4869/tesla-camera/issues', '_blank')}
               >
                 <Icons.Help size={14} />
               </button>
