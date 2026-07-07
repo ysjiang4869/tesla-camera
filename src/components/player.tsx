@@ -549,25 +549,15 @@ const S = {
     transition: 'left 80ms linear',
     pointerEvents: 'none' as const,
   },
-  eventMark: {
-    position: 'absolute' as const,
-    top: -7,
-    transform: 'translateX(-50%)',
-    width: 2,
-    height: 20,
-    background: 'var(--danger)',
-    borderRadius: 99,
-    pointerEvents: 'none' as const,
-  },
   eventMarkDot: {
     position: 'absolute' as const,
-    top: -8,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    width: 7, height: 7,
-    background: 'var(--danger)',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 9, height: 9,
     borderRadius: 99,
-    boxShadow: '0 0 0 3px oklch(0.68 0.21 25 / 0.25)',
+    background: 'var(--danger)',
+    boxShadow: '0 0 0 2px oklch(0.68 0.21 25 / 0.25)',
+    pointerEvents: 'none' as const,
   },
   timelineMeta: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -710,17 +700,24 @@ function buildInitialClipDurations(videos?: Video[]): number[] {
   return durations
 }
 
-function locateClipByTimelineTime(timelineTime: number, clipDurations: number[]): { index: number; time: number } {
-  if (!clipDurations.length) return { index: 0, time: 0 }
-  let remains = Math.max(0, timelineTime)
-  for (let index = 0; index < clipDurations.length; index++) {
-    const duration = Math.max(normalizeDuration(clipDurations[index]), 0.1)
-    if (remains < duration || index === clipDurations.length - 1) {
-      return { index, time: Math.min(remains, Math.max(duration - 0.01, 0)) }
-    }
-    remains -= duration
+function locateClipByTimelineTime(
+  timelineTime: number,
+  clipStarts: number[],
+  clipDurations: number[],
+): { index: number; time: number } {
+  if (!clipStarts.length) return { index: 0, time: 0 }
+  const target = Math.max(0, timelineTime)
+  let index = clipStarts.length - 1
+  for (let i = 1; i < clipStarts.length; i++) {
+    if (clipStarts[i] > target) { index = i - 1; break }
   }
-  return { index: clipDurations.length - 1, time: 0 }
+  const duration = Math.max(normalizeDuration(clipDurations[index]), 0.1)
+  const offset = target - clipStarts[index]
+  // 落在段尾与下一段之间的录制间隙时，吸附到下一段开头
+  if (offset >= duration && index < clipStarts.length - 1) {
+    return { index: index + 1, time: 0 }
+  }
+  return { index, time: Math.min(offset, Math.max(duration - 0.01, 0)) }
 }
 
 async function loadClipDuration(src: string): Promise<number | undefined> {
@@ -819,41 +816,32 @@ const Player: React.FC<PlayerProps> = (props) => {
   const acceleratorValue = clampPercent(acceleratorPercent ?? 0)
   const acceleratorText = acceleratorPercent === undefined ? '--' : `${Math.round(acceleratorPercent)}%`
 
+  // 时间轴采用文件名墙钟坐标系：每段起点 = 文件名时间戳相对首段的偏移，
+  // 段间的录制间隙保留在轴上，进度条、事件红点与画面时间字幕保持一致
   const clipStarts = useMemo(() => {
-    let acc = 0
-    return clipDurations.map((duration) => {
-      const start = acc; acc += normalizeDuration(duration); return start
+    if (!videos.length) return []
+    const base = videos[0].time
+    let prev = 0
+    return videos.map((video) => {
+      prev = Math.max(prev, (video.time - base) / 1000)
+      return prev
     })
-  }, [clipDurations])
+  }, [videos])
 
-  const totalDuration = useMemo(
-    () => clipDurations.reduce((acc, duration) => acc + normalizeDuration(duration), 0),
-    [clipDurations],
-  )
+  const totalDuration = useMemo(() => {
+    if (!clipStarts.length) return 0
+    const lastDuration = normalizeDuration(clipDurations[clipStarts.length - 1])
+    return clipStarts[clipStarts.length - 1] + (lastDuration || 60)
+  }, [clipDurations, clipStarts])
   const currentClipDuration = normalizeDuration(clipDurations[currentClipIndex])
   const sliderMax = totalDuration > 0 ? totalDuration : 0.1
 
-  const filenameNominalClipMs = useMemo(() => {
-    if (videos.length < 2) return 60000
-    const diffs = videos.slice(1)
-      .map((video, index) => video.time - videos[index].time)
-      .filter(diff => diff > 1000 && diff < 300000)
-      .sort((a, b) => a - b)
-    if (!diffs.length) return 60000
-    return diffs[Math.floor(diffs.length / 2)]
-  }, [videos])
-
-  const filenameTimelineTotalMs = useMemo(() => {
-    if (!videos.length) return 0
-    if (videos.length === 1) return filenameNominalClipMs
-    return Math.max(1, videos[videos.length - 1].time - videos[0].time + filenameNominalClipMs)
-  }, [filenameNominalClipMs, videos])
-
+  // 事件时间与时间轴同为墙钟坐标，直接取相对首段的偏移
   const eventTimelineTime = useMemo(() => {
-    if (!props.eventTime || !videos.length || filenameTimelineTotalMs <= 0) return undefined
-    const offsetMs = props.eventTime - videos[0].time
-    return Math.max(0, offsetMs / 1000)
-  }, [filenameTimelineTotalMs, props.eventTime, videos])
+    const eventTime = props.eventTime
+    if (!eventTime || !videos.length) return undefined
+    return Math.max(0, (eventTime - videos[0].time) / 1000)
+  }, [props.eventTime, videos])
 
   const scrubRatio = sliderMax > 0 ? Math.min(1, Math.max(0, currentTimelineTime / sliderMax)) : 0
   const eventRatio = eventTimelineTime !== undefined && sliderMax > 0
@@ -941,7 +929,7 @@ const Player: React.FC<PlayerProps> = (props) => {
   function seekTimeline(nextTimelineTime: number) {
     if (!videoRef.current || !videos.length) return
     const clamped = Math.min(Math.max(nextTimelineTime, 0), sliderMax)
-    const { index, time } = locateClipByTimelineTime(clamped, clipDurations)
+    const { index, time } = locateClipByTimelineTime(clamped, clipStarts, clipDurations)
     const autoplay = playIntentRef.current
     if (index === currentClipIndex) {
       videoRef.current.pause()
@@ -1326,9 +1314,7 @@ const Player: React.FC<PlayerProps> = (props) => {
                 ))}
               </div>
               {eventRatio !== undefined && (
-                <div style={{ ...S.eventMark, left: `${eventRatio * 100}%` }}>
-                  <div style={S.eventMarkDot} />
-                </div>
+                <div style={{ ...S.eventMarkDot, left: `${eventRatio * 100}%` }} />
               )}
               <div style={{ ...S.scrubThumb, left: `${scrubRatio * 100}%` }} />
             </div>
