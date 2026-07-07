@@ -1,3 +1,13 @@
+## [2.1.1](https://github.com/ysjiang4869/tesla-camera/compare/v2.1.0...v2.1.1) (2026-07-07)
+
+
+### Bug Fixes
+
+* 播放器进度条 ([fc8cd2e](https://github.com/ysjiang4869/tesla-camera/commit/fc8cd2e2a87722fa4bab2ba745774f7ca958ae49))
+* fix commit hook ([694134d](https://github.com/ysjiang4869/tesla-camera/commit/694134da5171a7f526c4f52967feb21bb0b63e67))
+
+
+
 # [2.1.0](https://github.com/ysjiang4869/tesla-camera/compare/v2.0.2...v2.1.0) (2026-07-06)
 
 
