@@ -1,4 +1,12 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+# GUI git clients (e.g. Fork) don't source shell profiles, so nvm node bins
+# are missing from PATH. Resolve nvm's current node version and inject it.
+export NVM_DIR="$HOME/.nvm"
+if [ -d "$NVM_DIR/versions/node" ]; then
+  NVM_NODE_BIN=$(ls -dt "$NVM_DIR/versions/node"/*/bin 2>/dev/null | head -1)
+  [ -n "$NVM_NODE_BIN" ] && export PATH="$NVM_NODE_BIN:$PATH"
+fi
+
 pnpm lint-staged
